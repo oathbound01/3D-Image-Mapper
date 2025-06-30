@@ -1,0 +1,24 @@
+{
+  "dependencies": {
+    "three": "^0.178.0"
+  },
+  "name": "3d-image-mapper",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/oathbound01/3D-Image-Mapper.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/oathbound01/3D-Image-Mapper/issues"
+  },
+  "homepage": "https://github.com/oathbound01/3D-Image-Mapper#readme"
+}
