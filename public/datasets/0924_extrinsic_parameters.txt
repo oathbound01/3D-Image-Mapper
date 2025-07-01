@@ -1,0 +1,6 @@
+cam_2_lidar_T = np.array([[0.00091333], 
+                          [ 0.208801], 
+                          [-0.0631608]], dtype=np.float64) 
+
+cam_2_lidar_R = np.array([0.624689, -0.346966, 0.329864,  0.616902], dtype=np.float64)
+

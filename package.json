@@ -1,14 +1,20 @@
 {
   "dependencies": {
-    "three": "^0.178.0"
+    "csv-parse": "^5.6.0",
+    "three": "^0.178.0",
+    "three-mesh-ui": "^6.5.4",
+    "three-stdlib": "^2.36.0"
   },
   "name": "3d-image-mapper",
   "version": "1.0.0",
+  "type": "module",
   "description": "",
   "main": "index.js",
-  "devDependencies": {},
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "build:tour": "node scripts/build-tour.js"
   },
   "repository": {
     "type": "git",
@@ -20,5 +26,9 @@
   "bugs": {
     "url": "https://github.com/oathbound01/3D-Image-Mapper/issues"
   },
-  "homepage": "https://github.com/oathbound01/3D-Image-Mapper#readme"
+  "homepage": "https://github.com/oathbound01/3D-Image-Mapper#readme",
+  "devDependencies": {
+    "@vitejs/plugin-basic-ssl": "^2.1.0",
+    "vite": "^7.0.0"
+  }
 }
