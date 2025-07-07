@@ -8,55 +8,40 @@ console.log('Starting tour generation script...');
 const DATASET_PATH = path.resolve('public/datasets');
 const OUTPUT_PATH = path.resolve('public/tour.json');
 
+const CALIBRATION_PATH = path.join(DATASET_PATH, 'Params/Cam_to_Cam/1104');
 const CAM_CSV_PATH = path.join(DATASET_PATH, 'CAM.csv');
 const POSE_FILE_PATH = path.join(DATASET_PATH, 'T1-College_of_Engineering-2-lidar_pose.txt');
 
-// --- MATRICI DI CALIBRAZIONE E TRASFORMAZIONE ---
-
-// Matrice di trasformazione da LiDAR a Camera 1 (estrinseci)
 const LiDARtoCam1_T = new THREE.Vector3(0.000201694, 0.210414, -0.0715605);
 const LiDARtoCam1_R = new THREE.Quaternion(0.623898, -0.345435, 0.326748, 0.620211).normalize();
 const LiDARtoCam1 = new THREE.Matrix4().compose(LiDARtoCam1_T, LiDARtoCam1_R, new THREE.Vector3(1, 1, 1));
 
-// Matrice per centrare il rig. Semplificazione a identità, dato che è una piccola traslazione.
-const Cam1toBase = new THREE.Matrix4().identity();
+console.log(`Loading Cam-to-Cam calibrations from: ${CALIBRATION_PATH}`);
+const basePosition = new THREE.Vector3(0, 0, 0);
+for (let i = 2; i <= 6; i++) {
+    const jsonPath = path.join(CALIBRATION_PATH, `T_${i}1.json`);
+    const matrixData = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
+    const translation = new THREE.Vector3(matrixData[0][3], matrixData[1][3], matrixData[2][3]);
+    basePosition.add(translation);
+}
+basePosition.divideScalar(6);
+const Cam1toBase = new THREE.Matrix4().makeTranslation(basePosition.negate());
+console.log('Cam1toBase matrix calculated successfully.');
 
-// Rotazione manuale di correzione di 30 gradi sull'asse Y, come da script Python.
 const manualAdjustment = new THREE.Matrix4().makeRotationY(THREE.MathUtils.degToRad(30));
-
-// Matrice per correggere il sistema di coordinate (Y in basso -> Y in alto)
 const coordSystemFix = new THREE.Matrix4().makeRotationX(Math.PI);
+const panoConventionFix = new THREE.Matrix4().makeRotationY(THREE.MathUtils.degToRad(180));
 
-// ***** NUOVA MATRICE DI CORREZIONE DELLA CONVENZIONE PANORAMA *****
-// L'analisi del codice Python mostra che il centro del panorama è la direzione "destra" (+X) della camera.
-// Dobbiamo ruotare di -90 gradi attorno all'asse Y per allineare la direzione "destra"
-// della nuvola di punti con la direzione "avanti" (-Z) della scena Three.js.
-const panoConventionFix = new THREE.Matrix4().makeRotationY(THREE.MathUtils.degToRad(-90));
-// *****************************************************************
-
-// Costruiamo la matrice di trasformazione locale finale, `lidarToPanoMatrix`.
-// L'ordine è FONDAMENTALE. Le trasformazioni vengono applicate ai punti da destra a sinistra.
-// La catena logica è: P_pano = (Fixes) * (Adjustments) * (Calibration) * P_lidar
-//
-// M_final = panoConventionFix * coordSystemFix * manualAdjustment * Cam1toBase * LiDARtoCam1
-//
-// In Three.js (A.multiply(B) = A * B), costruiamo la catena:
 const lidarToPanoMatrix = new THREE.Matrix4();
-lidarToPanoMatrix.multiply(manualAdjustment);    // M = manualAdjustment
-lidarToPanoMatrix.multiply(Cam1toBase);          // M = M * Cam1toBase
-lidarToPanoMatrix.multiply(LiDARtoCam1);        // M = M * LiDARtoCam1
+lidarToPanoMatrix.multiply(manualAdjustment);
+lidarToPanoMatrix.multiply(Cam1toBase);
+lidarToPanoMatrix.multiply(LiDARtoCam1);
+lidarToPanoMatrix.premultiply(coordSystemFix);
+lidarToPanoMatrix.premultiply(panoConventionFix);
 
-// Ora applichiamo le correzioni di sistema e convenzione "davanti" a tutto.
-// Usiamo premultiply per A = FIX * A
-lidarToPanoMatrix.premultiply(coordSystemFix);     // M = coordSystemFix * M
-lidarToPanoMatrix.premultiply(panoConventionFix); // M = panoConventionFix * M
-
-console.log('Calibration matrices loaded and composed with all fixes.');
-
-// --- PARSING DEI FILE DI INPUT (Nessuna modifica qui) ---
+console.log('Final transformation matrix composed.');
 
 function parsePoseFile(filePath) {
-    // ... (codice invariato)
     console.log(`Parsing pose file: ${filePath}`);
     const fileContent = fs.readFileSync(filePath, 'utf8');
     const lines = fileContent.trim().split('\n');
@@ -84,7 +69,6 @@ function parsePoseFile(filePath) {
 }
 
 function parseCamCsv(filePath) {
-    // ... (codice invariato)
     console.log(`Parsing CAM CSV file: ${filePath}`);
     const fileContent = fs.readFileSync(filePath, 'utf8');
     const records = parse(fileContent, {
@@ -96,7 +80,6 @@ function parseCamCsv(filePath) {
 }
 
 function findClosestPose(timestamp, poseMap) {
-    // ... (codice invariato)
     const targetTime = parseFloat(timestamp);
     let closestTime = null;
     let minDiff = Infinity;
@@ -112,7 +95,6 @@ function findClosestPose(timestamp, poseMap) {
     return poseMap.get(closestTime);
 }
 
-// --- COSTRUZIONE DEL FILE tour.json (Nessuna modifica qui) ---
 try {
     const poseMap = parsePoseFile(POSE_FILE_PATH);
     const camRecords = parseCamCsv(CAM_CSV_PATH);
@@ -125,7 +107,6 @@ try {
     for (const record of camRecords) {
         const pcdTimestamp = record.pcd_name.replace('.pcd', '');
         const pcdTimeInSeconds = (BigInt(pcdTimestamp) / BigInt(1e9)) + '.' + (BigInt(pcdTimestamp) % BigInt(1e9));
-
         const worldMatrix = findClosestPose(pcdTimeInSeconds, poseMap);
 
         if (worldMatrix) {
@@ -134,15 +115,10 @@ try {
                 pcd: `datasets/pcd/${record.pcd_name}`,
                 worldMatrix: worldMatrix.toArray(),
             });
-        } else {
-            console.warn(`No pose found for pcd: ${record.pcd_name}`);
         }
     }
-
     fs.writeFileSync(OUTPUT_PATH, JSON.stringify(tourData, null, 2));
     console.log(`✅ Success! Tour data has been written to ${OUTPUT_PATH}`);
-    console.log(`Generated ${tourData.stops.length} tour stops.`);
-
 } catch (error) {
     console.error('❌ An error occurred during tour generation:', error);
 }
