@@ -99,26 +99,43 @@ try {
     const poseMap = parsePoseFile(POSE_FILE_PATH);
     const camRecords = parseCamCsv(CAM_CSV_PATH);
 
+    // TEST CODE FOR EQUIDISTANT STOPS
+
+    const totalStops = camRecords.length;
+    const numStops = 20;
+
+    // Calculate equidistant indices
+    const step = Math.floor(totalStops / (numStops - 1));
+    const selectedIndices = [];
+    for (let i = 0; i < numStops - 1; i++) {
+    selectedIndices.push(i * step);
+    }
+    // Ensure last index is included
+    selectedIndices.push(totalStops - 1);
+
+
     const tourData = {
         lidarToPanoMatrix: lidarToPanoMatrix.toArray(),
         stops: []
     };
 
-    for (const record of camRecords) {
+    for (let i = 0; i < selectedIndices.length; i++) {
+        const idx = selectedIndices[i];
+        const record = camRecords[idx];
         const pcdTimestamp = record.pcd_name.replace('.pcd', '');
         const pcdTimeInSeconds = (BigInt(pcdTimestamp) / BigInt(1e9)) + '.' + (BigInt(pcdTimestamp) % BigInt(1e9));
         const worldMatrix = findClosestPose(pcdTimeInSeconds, poseMap);
-
         if (worldMatrix) {
             tourData.stops.push({
-                image: `datasets/stitching/${record.image_name}`,
-                pcd: `datasets/pcd/${record.pcd_name}`,
-                worldMatrix: worldMatrix.toArray(),
+            image: `datasets/stitching/${record.image_name}`,
+            pcd: `datasets/pcd/${record.pcd_name}`,
+            worldMatrix: worldMatrix.toArray(),
             });
         }
     }
+
     fs.writeFileSync(OUTPUT_PATH, JSON.stringify(tourData, null, 2));
-    console.log(`✅ Success! Tour data has been written to ${OUTPUT_PATH}`);
+    console.log(`Success! Tour data has been written to ${OUTPUT_PATH}`);
 } catch (error) {
-    console.error('❌ An error occurred during tour generation:', error);
+    console.error('An error occurred during tour generation:', error);
 }

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
-import {OrbitControls} from 'three/examples/jsm/controls/OrbitControls.js';
-import {PCDLoader} from 'three/examples/jsm/loaders/PCDLoader.js';
-import {VRButton} from 'three/examples/jsm/webxr/VRButton.js';
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { PCDLoader } from 'three/examples/jsm/loaders/PCDLoader.js';
+import { VRButton } from 'three/examples/jsm/webxr/VRButton.js';
 
 let camera, scene, renderer;
 let controls;
@@ -16,117 +16,272 @@ const prevBtn = document.getElementById('prevBtn');
 const nextBtn = document.getElementById('nextBtn');
 const infoDiv = document.getElementById('info');
 
+const NAVIGATION_THRESHOLD = 1.0; // meters
+
+// --- Hover Marker Setup ---
+let hoverMarker;
+function createHoverMarker() {
+  const geometry = new THREE.SphereGeometry(0.15, 16, 16);
+  const material = new THREE.MeshBasicMaterial({ color: 0x00ff00, opacity: 0.7, transparent: true });
+  hoverMarker = new THREE.Mesh(geometry, material);
+  hoverMarker.visible = false;
+  scene.add(hoverMarker);
+}
+
+// --- Click/Drag Detection ---
+let mouseDownPos = null;
+let mouseMoved = false;
+
 init();
 
 async function init() {
-    try {
-        const response = await fetch('tour.json');
-        tourData = await response.json();
-        console.log("Tour data loaded:", tourData);
-        lidarToPanoMatrix.fromArray(tourData.lidarToPanoMatrix);
-    } catch (error) {
-        console.error("Failed to load tour.json:", error);
-        infoDiv.textContent = "Error: Could not load tour data.";
-        return;
-    }
+  try {
+    const response = await fetch('tour.json');
+    tourData = await response.json();
+    lidarToPanoMatrix.fromArray(tourData.lidarToPanoMatrix);
+  } catch (error) {
+    infoDiv.textContent = "Error: Could not load tour data.";
+    return;
+  }
 
-    scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x101010);
-    scene.add(activeObjects);
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x101010);
+  scene.add(activeObjects);
 
-    camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-    camera.position.set(0, 0, 0);
+  camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+  camera.position.set(0, 0, 0);
 
-    renderer = new THREE.WebGLRenderer({antialias: true});
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.xr.enabled = true;
-    document.body.appendChild(renderer.domElement);
-    document.body.appendChild(VRButton.createButton(renderer));
+  renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.xr.enabled = true;
+  document.body.appendChild(renderer.domElement);
+  document.body.appendChild(VRButton.createButton(renderer));
 
-    controls = new OrbitControls(camera, renderer.domElement);
-    controls.enableZoom = true;
-    controls.target.set(0, 0, -1);
+  controls = new OrbitControls(camera, renderer.domElement);
+  controls.enableZoom = true;
+  controls.target.set(0, 0, -1);
 
-    window.addEventListener('resize', onWindowResize);
-    prevBtn.addEventListener('click', () => navigate(-1));
-    nextBtn.addEventListener('click', () => navigate(1));
+  window.addEventListener('resize', onWindowResize);
 
-    if (tourData.stops.length > 0) {
-        await loadStop(0);
-    } else {
-        infoDiv.textContent = "No stops in tour data.";
-    }
+  prevBtn.addEventListener('click', () => navigate(-1));
+  nextBtn.addEventListener('click', () => navigate(1));
 
-    renderer.setAnimationLoop(animate);
+  renderer.domElement.addEventListener('mousedown', onMouseDown);
+  renderer.domElement.addEventListener('mousemove', onMouseMoveHover);
+  renderer.domElement.addEventListener('mouseup', onMouseUp);
+
+  createHoverMarker();
+
+  if (tourData.stops.length > 0) {
+    await loadStop(0);
+  } else {
+    infoDiv.textContent = "No stops in tour data.";
+  }
+
+  renderer.setAnimationLoop(animate);
 }
 
 async function loadStop(index) {
-    if (index < 0 || index >= tourData.stops.length) {
-        console.warn(`Index ${index} is out of bounds.`);
-        return;
-    }
-    currentStopIndex = index;
+  if (index < 0 || index >= tourData.stops.length) {
+    return;
+  }
 
-    activeObjects.clear();
+  currentStopIndex = index;
+  activeObjects.clear();
+  const stopData = tourData.stops[index];
 
-    const stopData = tourData.stops[index];
-    const textureLoader = new THREE.TextureLoader();
-    const pcdLoader = new PCDLoader();
+  const textureLoader = new THREE.TextureLoader();
+  const pcdLoader = new PCDLoader();
 
-    infoDiv.textContent = `Loading stop ${index + 1} / ${tourData.stops.length}...`;
+  infoDiv.textContent = `Loading stop ${index + 1} / ${tourData.stops.length}...`;
 
-    try {
-        const [panoTexture, pcd] = await Promise.all([
-            textureLoader.loadAsync(stopData.image),
-            pcdLoader.loadAsync(stopData.pcd),
-        ]);
+  try {
+    const [panoTexture, pcd] = await Promise.all([
+      textureLoader.loadAsync(stopData.image),
+      pcdLoader.loadAsync(stopData.pcd),
+    ]);
 
-        const sphereGeo = new THREE.SphereGeometry(500, 60, 40);
-        sphereGeo.scale(-1, 1, 1);
-        const sphereMat = new THREE.MeshBasicMaterial({map: panoTexture});
-        const panoSphere = new THREE.Mesh(sphereGeo, sphereMat);
-        activeObjects.add(panoSphere);
+    // Panorama sphere
+    const sphereGeo = new THREE.SphereGeometry(500, 60, 40);
+    sphereGeo.scale(-1, 1, 1);
+    const sphereMat = new THREE.MeshBasicMaterial({ map: panoTexture });
+    const panoSphere = new THREE.Mesh(sphereGeo, sphereMat);
+    activeObjects.add(panoSphere);
 
-        pcd.material.size = 0.03;
-        pcd.geometry.applyMatrix4(lidarToPanoMatrix);
+    // Point cloud
+    pcd.material.size = 0.03;
+    pcd.geometry.applyMatrix4(lidarToPanoMatrix);
+    activeObjects.add(pcd);
 
-        activeObjects.add(pcd);
+    // Apply world transformation
+    worldMatrix.fromArray(stopData.worldMatrix);
+    activeObjects.position.setFromMatrixPosition(worldMatrix);
+    activeObjects.quaternion.setFromRotationMatrix(worldMatrix);
 
-        worldMatrix.fromArray(stopData.worldMatrix);
-        activeObjects.position.setFromMatrixPosition(worldMatrix);
-        activeObjects.quaternion.setFromRotationMatrix(worldMatrix);
+    // Camera and controls
+    camera.position.copy(activeObjects.position);
+    camera.position.y += 0.1;
+    controls.target.copy(activeObjects.position);
 
-        camera.position.copy(activeObjects.position);
-        camera.position.y += 0.1;
-        controls.target.copy(activeObjects.position);
-
-        updateUI();
-        console.log(`Stop ${index} loaded successfully.`);
-
-    } catch (error) {
-        console.error(`Failed to load stop ${index}:`, error);
-        infoDiv.textContent = `Error loading stop ${index + 1}.`;
-    }
+    updateUI();
+  } catch (error) {
+    infoDiv.textContent = `Error loading stop ${index + 1}.`;
+  }
 }
 
 function navigate(direction) {
-    const newIndex = currentStopIndex + direction;
-    loadStop(newIndex);
+  const newIndex = currentStopIndex + direction;
+  loadStop(newIndex);
 }
 
 function updateUI() {
-    infoDiv.textContent = `Stop ${currentStopIndex + 1} / ${tourData.stops.length}`;
-    prevBtn.disabled = currentStopIndex === 0;
-    nextBtn.disabled = currentStopIndex === tourData.stops.length - 1;
+  infoDiv.textContent = `Stop ${currentStopIndex + 1} / ${tourData.stops.length}`;
+  prevBtn.disabled = currentStopIndex === 0;
+  nextBtn.disabled = currentStopIndex === tourData.stops.length - 1;
 }
 
 function onWindowResize() {
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
 }
 
 function animate() {
-    controls.update();
-    renderer.render(scene, camera);
+  controls.update();
+  renderer.render(scene, camera);
+}
+
+// --- Mouse Down/Up for Click Detection ---
+function onMouseDown(event) {
+  mouseDownPos = { x: event.clientX, y: event.clientY };
+  mouseMoved = false;
+}
+
+function onMouseUp(event) {
+  if (!mouseDownPos) return;
+  const dx = event.clientX - mouseDownPos.x;
+  const dy = event.clientY - mouseDownPos.y;
+  const moveDist = Math.sqrt(dx * dx + dy * dy);
+  mouseDownPos = null;
+
+  // Only treat as click if mouse did not move significantly
+  if (moveDist < 5) {
+    onPointCloudClick(event);
+  }
+}
+
+// --- Point Cloud Click Navigation (Front/Back) ---
+function onPointCloudClick(event) {
+  const rect = renderer.domElement.getBoundingClientRect();
+  const mouse = new THREE.Vector2(
+    ((event.clientX - rect.left) / rect.width) * 2 - 1,
+    -((event.clientY - rect.top) / rect.height) * 2 + 1
+  );
+
+  const raycaster = new THREE.Raycaster();
+  raycaster.params.Points.threshold = 0.2;
+  raycaster.setFromCamera(mouse, camera);
+
+  let pointCloud = null;
+  activeObjects.traverse(obj => {
+    if (obj.isPoints) pointCloud = obj;
+  });
+  if (!pointCloud) return;
+
+  const intersects = raycaster.intersectObject(pointCloud);
+  if (intersects.length === 0) return;
+
+  const clickedPoint = intersects[0].point;
+  const camDir = new THREE.Vector3();
+  camera.getWorldDirection(camDir);
+
+  // Vector from camera to clicked point (in world space)
+  const camToPoint = new THREE.Vector3().subVectors(clickedPoint, camera.position).normalize();
+
+  // Angle between camera forward and camToPoint
+  const angle = camDir.angleTo(camToPoint);
+
+  // Define front zone (within 45deg of camera forward), back zone (within 45deg of camera backward)
+  const FRONT_ANGLE = Math.PI / 4; // 45 degrees
+
+  let navigated = false;
+
+  // Front: previous stop
+  if (currentStopIndex > 0 && angle < FRONT_ANGLE) {
+    loadStop(currentStopIndex - 1);
+    navigated = true;
+  }
+  // Back: next stop
+  if (!navigated && currentStopIndex < tourData.stops.length - 1 && angle > Math.PI - FRONT_ANGLE) {
+    loadStop(currentStopIndex + 1);
+    navigated = true;
+  }
+
+  if (!navigated) {
+    infoDiv.textContent = "Click in front (previous) or back (next) to navigate.";
+  }
+}
+
+// --- Hover Feedback Logic (Front/Back Zones) ---
+function onMouseMoveHover(event) {
+  const rect = renderer.domElement.getBoundingClientRect();
+  const mouse = new THREE.Vector2(
+    ((event.clientX - rect.left) / rect.width) * 2 - 1,
+    -((event.clientY - rect.top) / rect.height) * 2 + 1
+  );
+
+  const raycaster = new THREE.Raycaster();
+  raycaster.params.Points.threshold = 0.2;
+  raycaster.setFromCamera(mouse, camera);
+
+  let pointCloud = null;
+  activeObjects.traverse(obj => {
+    if (obj.isPoints) pointCloud = obj;
+  });
+  if (!pointCloud) {
+    hoverMarker.visible = false;
+    renderer.domElement.style.cursor = 'default';
+    updateUI();
+    return;
+  }
+
+  const intersects = raycaster.intersectObject(pointCloud);
+  if (intersects.length === 0) {
+    hoverMarker.visible = false;
+    renderer.domElement.style.cursor = 'default';
+    updateUI();
+    return;
+  }
+
+  const intersectPoint = intersects[0].point;
+  const camDir = new THREE.Vector3();
+  camera.getWorldDirection(camDir);
+  const camToPoint = new THREE.Vector3().subVectors(intersectPoint, camera.position).normalize();
+  const angle = camDir.angleTo(camToPoint);
+  const FRONT_ANGLE = Math.PI / 4; // 45 degrees
+
+  let hoveredZone = null;
+  let hoverText = '';
+
+  // Front: previous stop
+  if (currentStopIndex > 0 && angle < FRONT_ANGLE) {
+    hoveredZone = 'front';
+    hoverText = 'Go to Previous Stop';
+  }
+  // Back: next stop
+  if (!hoveredZone && currentStopIndex < tourData.stops.length - 1 && angle > Math.PI - FRONT_ANGLE) {
+    hoveredZone = 'back';
+    hoverText = 'Go to Next Stop';
+  }
+
+  if (hoveredZone) {
+    hoverMarker.position.copy(intersectPoint);
+    hoverMarker.visible = true;
+    renderer.domElement.style.cursor = 'pointer';
+    infoDiv.textContent = `${hoverText} (${currentStopIndex + 1} / ${tourData.stops.length})`;
+  } else {
+    hoverMarker.visible = false;
+    renderer.domElement.style.cursor = 'default';
+    updateUI();
+  }
 }
