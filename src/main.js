@@ -123,6 +123,10 @@ async function loadStop(index) {
     // The transformation matrix is now loaded per stop
     const pcdMatrix = new THREE.Matrix4().fromArray(stopData.matrix);
     pcd.geometry.applyMatrix4(pcdMatrix);
+    
+    // Filter out points too close to origin to improve raycasting
+    filterPointCloudNearOrigin(pcd, 0.3, 4); // radius: 0.3m, height: 4m
+
     activeObjects.add(pcd);
 
 
@@ -295,4 +299,49 @@ function onMouseMoveHover(event) {
     renderer.domElement.style.cursor = 'default';
     updateUI();
   }
+}
+
+// --- Point Cloud Filtering ---
+function filterPointCloudNearOrigin(pointCloud, cylinderRadius = 0.25, cylinderHeight = 2.0) {
+  const positions = pointCloud.geometry.attributes.position;
+  const colors = pointCloud.geometry.attributes.color;
+  
+  const filteredPositions = [];
+  const filteredColors = [];
+  
+  for (let i = 0; i < positions.count; i++) {
+    const x = positions.getX(i);
+    const y = positions.getY(i);
+    const z = positions.getZ(i);
+    
+    // Calcola distanza dal centro nel piano XY (raggio cilindro)
+    const distanceXY = Math.sqrt(x * x + y * y);
+    
+    // Controlla se il punto è fuori dal cilindro di esclusione
+    if (distanceXY > cylinderRadius || Math.abs(z) > cylinderHeight / 2) {
+      filteredPositions.push(x, y, z);
+      
+      if (colors) {
+        filteredColors.push(
+          colors.getX(i),
+          colors.getY(i),
+          colors.getZ(i)
+        );
+      }
+    }
+  }
+  
+  // Crea nuova geometria con i punti filtrati
+  const newGeometry = new THREE.BufferGeometry();
+  newGeometry.setAttribute('position', new THREE.Float32BufferAttribute(filteredPositions, 3));
+  
+  if (colors && filteredColors.length > 0) {
+    newGeometry.setAttribute('color', new THREE.Float32BufferAttribute(filteredColors, 3));
+  }
+  
+  // Sostituisci la geometria esistente
+  pointCloud.geometry.dispose();
+  pointCloud.geometry = newGeometry;
+  
+  console.log(`Filtered point cloud: ${positions.count} -> ${filteredPositions.length / 3} points`);
 }
