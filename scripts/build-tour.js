@@ -4,6 +4,8 @@ import path from 'path';
 
 console.log('Starting tour generation script...');
 
+let pcdFiles = [];
+let imgFiles = [];
 const DATASET_PATH = path.resolve('public/datasets');
 const ALIGNMENTS_PATH = path.resolve('public/alignments.json'); // Expects alignments.json in the root
 const OUTPUT_PATH = path.resolve('public/tour.json');
@@ -17,6 +19,26 @@ function getSortedFiles(dir, exts) {
     return filtered.sort();
 }
 
+/**
+ * Extracts a list of files from a list.json file in the specified directory, which contains a single array of strings (file names.extensions).
+ * If no list.json is found, it will return an empty array.
+ * @param {} dir 
+ * @param {*} exts 
+ */
+function readFileList(dir, exts) {
+    const listPath = path.join(dir, 'list.json');
+    if (!fs.existsSync(listPath)) {
+        console.error(`list.json not found in ${dir}. Please ensure the file exists and contains a valid array of file names.`);
+        return [];
+    }
+    const fileList = JSON.parse(fs.readFileSync(listPath, 'utf-8'));
+    if (!Array.isArray(fileList)) {
+        console.error('Invalid list.json format. Expected an array of file names.');
+        return [];
+    }
+    return fileList.filter(f => exts.some(ext => f.toLowerCase().endsWith(ext))).sort();
+}
+
 try {
     // 1. Read the manually created alignments
     if (!fs.existsSync(ALIGNMENTS_PATH)) {
@@ -26,8 +48,8 @@ try {
     console.log(`Loaded ${Object.keys(alignments).length} alignments.`);
 
     // 2. Get the lists of files to match indices
-    const pcdFiles = getSortedFiles(path.join(DATASET_PATH, 'pcd'), ['.pcd']);
-    const imgFiles = getSortedFiles(path.join(DATASET_PATH, 'stitching'), IMAGE_EXTENSIONS);
+    pcdFiles = readFileList(PCD_PATH, ['.pcd']);
+    imgFiles = readFileList(IMG_PATH, IMAGE_EXTENSIONS);
 
     if (pcdFiles.length === 0 || imgFiles.length === 0) {
         throw new Error('No PCD or image files found in the dataset directories.');

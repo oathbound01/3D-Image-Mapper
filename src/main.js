@@ -64,7 +64,8 @@ async function init() {
 
   controls = new OrbitControls(camera, renderer.domElement);
   controls.enableZoom = true;
-  controls.target.set(0, 0, -1);
+  controls.enableDamping = true;
+  controls.target.set(0, 0, Number.MIN_VALUE);
 
   window.addEventListener('resize', onWindowResize);
 
@@ -129,8 +130,8 @@ async function loadStop(index) {
     activeObjects.quaternion.set(0, 0, 0, 1);
 
     // Camera and controls
-    camera.position.set(0, 0, 0.1); // Start slightly inside the sphere
-    controls.target.set(0, 0, -1);
+    camera.position.set(0, 0, 0); // Start at center of the sphere
+    controls.target.set(0, 0, 0.00000001);
 
     updateUI();
   } catch (error) {
