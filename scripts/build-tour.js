@@ -9,8 +9,8 @@ let imgFiles = [];
 const DATASET_PATH = path.resolve('public/datasets');
 const ALIGNMENTS_PATH = path.resolve('public/alignments.json'); // Expects alignments.json in the root
 const OUTPUT_PATH = path.resolve('public/tour.json');
-const PCD_PATH = '/datasets/pcd/';
-const IMG_PATH = '/datasets/stitching/';
+const PCD_PATH = 'public/datasets/pcd/';
+const IMG_PATH = 'public/datasets/stitching/';
 const IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.webp'];
 
 function getSortedFiles(dir, exts) {
