@@ -5,11 +5,10 @@ import { VRButton } from 'three/examples/jsm/webxr/VRButton.js';
 
 let camera, scene, renderer;
 let controls;
-let tourData = null;
+let tourData = []; // Initialize as an empty array
 let currentStopIndex = 0;
 let activeObjects = new THREE.Group();
 
-const lidarToPanoMatrix = new THREE.Matrix4();
 const worldMatrix = new THREE.Matrix4();
 
 const prevBtn = document.getElementById('prevBtn');
@@ -38,13 +37,19 @@ async function init() {
   try {
     const response = await fetch('tour.json');
     tourData = await response.json();
-    lidarToPanoMatrix.fromArray(tourData.lidarToPanoMatrix);
   } catch (error) {
     infoDiv.textContent = "Error: Could not load tour data.";
+    console.error(error);
     return;
   }
 
   scene = new THREE.Scene();
+
+
+  // Axes Helper
+  const axesHelper = new THREE.AxesHelper(2); // 2 units long
+  scene.add(axesHelper);
+
   scene.background = new THREE.Color(0x101010);
   scene.add(activeObjects);
 
@@ -72,7 +77,7 @@ async function init() {
 
   createHoverMarker();
 
-  if (tourData.stops.length > 0) {
+  if (tourData.length > 0) {
     await loadStop(0);
   } else {
     infoDiv.textContent = "No stops in tour data.";
@@ -82,18 +87,22 @@ async function init() {
 }
 
 async function loadStop(index) {
-  if (index < 0 || index >= tourData.stops.length) {
+  if (index < 0 || index >= tourData.length) {
     return;
   }
 
   currentStopIndex = index;
-  activeObjects.clear();
-  const stopData = tourData.stops[index];
+  // Clear previous objects
+  while(activeObjects.children.length > 0){ 
+    activeObjects.remove(activeObjects.children[0]); 
+  }
+  
+  const stopData = tourData[index];
 
   const textureLoader = new THREE.TextureLoader();
   const pcdLoader = new PCDLoader();
 
-  infoDiv.textContent = `Loading stop ${index + 1} / ${tourData.stops.length}...`;
+  infoDiv.textContent = `Loading stop ${index + 1} / ${tourData.length}...`;
 
   try {
     const [panoTexture, pcd] = await Promise.all([
@@ -110,22 +119,23 @@ async function loadStop(index) {
 
     // Point cloud
     pcd.material.size = 0.03;
-    pcd.geometry.applyMatrix4(lidarToPanoMatrix);
+    // The transformation matrix is now loaded per stop
+    const pcdMatrix = new THREE.Matrix4().fromArray(stopData.matrix);
+    pcd.geometry.applyMatrix4(pcdMatrix);
     activeObjects.add(pcd);
 
-    // Apply world transformation
-    worldMatrix.fromArray(stopData.worldMatrix);
-    activeObjects.position.setFromMatrixPosition(worldMatrix);
-    activeObjects.quaternion.setFromRotationMatrix(worldMatrix);
+
+    activeObjects.position.set(0, 0, 0);
+    activeObjects.quaternion.set(0, 0, 0, 1);
 
     // Camera and controls
-    camera.position.copy(activeObjects.position);
-    camera.position.y += 0.1;
-    controls.target.copy(activeObjects.position);
+    camera.position.set(0, 0, 0.1); // Start slightly inside the sphere
+    controls.target.set(0, 0, -1);
 
     updateUI();
   } catch (error) {
     infoDiv.textContent = `Error loading stop ${index + 1}.`;
+    console.error(error);
   }
 }
 
@@ -135,9 +145,9 @@ function navigate(direction) {
 }
 
 function updateUI() {
-  infoDiv.textContent = `Stop ${currentStopIndex + 1} / ${tourData.stops.length}`;
+  infoDiv.textContent = `Stop ${currentStopIndex + 1} / ${tourData.length}`;
   prevBtn.disabled = currentStopIndex === 0;
-  nextBtn.disabled = currentStopIndex === tourData.stops.length - 1;
+  nextBtn.disabled = currentStopIndex === tourData.length - 1;
 }
 
 function onWindowResize() {

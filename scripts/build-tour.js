@@ -1,141 +1,62 @@
 import * as THREE from 'three';
 import fs from 'fs';
 import path from 'path';
-import { parse } from 'csv-parse/sync';
 
 console.log('Starting tour generation script...');
 
 const DATASET_PATH = path.resolve('public/datasets');
+const ALIGNMENTS_PATH = path.resolve('public/alignments.json'); // Expects alignments.json in the root
 const OUTPUT_PATH = path.resolve('public/tour.json');
+const PCD_PATH = '/datasets/pcd/';
+const IMG_PATH = '/datasets/stitching/';
+const IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.webp'];
 
-const CALIBRATION_PATH = path.join(DATASET_PATH, 'Params/Cam_to_Cam/1104');
-const CAM_CSV_PATH = path.join(DATASET_PATH, 'CAM.csv');
-const POSE_FILE_PATH = path.join(DATASET_PATH, 'T1-College_of_Engineering-2-lidar_pose.txt');
-
-const LiDARtoCam1_T = new THREE.Vector3(0.000201694, 0.210414, -0.0715605);
-const LiDARtoCam1_R = new THREE.Quaternion(0.623898, -0.345435, 0.326748, 0.620211).normalize();
-const LiDARtoCam1 = new THREE.Matrix4().compose(LiDARtoCam1_T, LiDARtoCam1_R, new THREE.Vector3(1, 1, 1));
-
-console.log(`Loading Cam-to-Cam calibrations from: ${CALIBRATION_PATH}`);
-const basePosition = new THREE.Vector3(0, 0, 0);
-for (let i = 2; i <= 6; i++) {
-    const jsonPath = path.join(CALIBRATION_PATH, `T_${i}1.json`);
-    const matrixData = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
-    const translation = new THREE.Vector3(matrixData[0][3], matrixData[1][3], matrixData[2][3]);
-    basePosition.add(translation);
-}
-basePosition.divideScalar(6);
-const Cam1toBase = new THREE.Matrix4().makeTranslation(basePosition.negate());
-console.log('Cam1toBase matrix calculated successfully.');
-
-const manualAdjustment = new THREE.Matrix4().makeRotationY(THREE.MathUtils.degToRad(30));
-const coordSystemFix = new THREE.Matrix4().makeRotationX(Math.PI);
-const panoConventionFix = new THREE.Matrix4().makeRotationY(THREE.MathUtils.degToRad(180));
-
-const lidarToPanoMatrix = new THREE.Matrix4();
-lidarToPanoMatrix.multiply(manualAdjustment);
-lidarToPanoMatrix.multiply(Cam1toBase);
-lidarToPanoMatrix.multiply(LiDARtoCam1);
-lidarToPanoMatrix.premultiply(coordSystemFix);
-lidarToPanoMatrix.premultiply(panoConventionFix);
-
-console.log('Final transformation matrix composed.');
-
-function parsePoseFile(filePath) {
-    console.log(`Parsing pose file: ${filePath}`);
-    const fileContent = fs.readFileSync(filePath, 'utf8');
-    const lines = fileContent.trim().split('\n');
-    const poseMap = new Map();
-
-    for (const line of lines) {
-        const parts = line.trim().split(/\s+/);
-        if (parts.length < 13) continue;
-
-        const timestamp = parts[0];
-        const matrixElements = parts.slice(1, 13).map(parseFloat);
-
-        const matrix = new THREE.Matrix4();
-        matrix.set(
-            matrixElements[0], matrixElements[1], matrixElements[2], matrixElements[3],
-            matrixElements[4], matrixElements[5], matrixElements[6], matrixElements[7],
-            matrixElements[8], matrixElements[9], matrixElements[10], matrixElements[11],
-            0, 0, 0, 1
-        );
-
-        poseMap.set(timestamp, matrix);
-    }
-    console.log(`Parsed ${poseMap.size} poses.`);
-    return poseMap;
-}
-
-function parseCamCsv(filePath) {
-    console.log(`Parsing CAM CSV file: ${filePath}`);
-    const fileContent = fs.readFileSync(filePath, 'utf8');
-    const records = parse(fileContent, {
-        columns: true,
-        skip_empty_lines: true,
-    });
-    console.log(`Parsed ${records.length} records from CAM.csv.`);
-    return records;
-}
-
-function findClosestPose(timestamp, poseMap) {
-    const targetTime = parseFloat(timestamp);
-    let closestTime = null;
-    let minDiff = Infinity;
-
-    for (const key of poseMap.keys()) {
-        const poseTime = parseFloat(key);
-        const diff = Math.abs(targetTime - poseTime);
-        if (diff < minDiff) {
-            minDiff = diff;
-            closestTime = key;
-        }
-    }
-    return poseMap.get(closestTime);
+function getSortedFiles(dir, exts) {
+    const allFiles = fs.readdirSync(dir);
+    const filtered = allFiles.filter(f => exts.some(ext => f.toLowerCase().endsWith(ext)));
+    return filtered.sort();
 }
 
 try {
-    const poseMap = parsePoseFile(POSE_FILE_PATH);
-    const camRecords = parseCamCsv(CAM_CSV_PATH);
-
-    // TEST CODE FOR EQUIDISTANT STOPS
-
-    const totalStops = camRecords.length;
-    const numStops = 20;
-
-    // Calculate equidistant indices
-    const step = Math.floor(totalStops / (numStops - 1));
-    const selectedIndices = [];
-    for (let i = 0; i < numStops - 1; i++) {
-    selectedIndices.push(i * step);
+    // 1. Read the manually created alignments
+    if (!fs.existsSync(ALIGNMENTS_PATH)) {
+        throw new Error(`Alignments file not found at ${ALIGNMENTS_PATH}. Please run the alignment utility and save the file.`);
     }
-    // Ensure last index is included
-    selectedIndices.push(totalStops - 1);
+    const alignments = JSON.parse(fs.readFileSync(ALIGNMENTS_PATH, 'utf-8'));
+    console.log(`Loaded ${Object.keys(alignments).length} alignments.`);
 
+    // 2. Get the lists of files to match indices
+    const pcdFiles = getSortedFiles(path.join(DATASET_PATH, 'pcd'), ['.pcd']);
+    const imgFiles = getSortedFiles(path.join(DATASET_PATH, 'stitching'), IMAGE_EXTENSIONS);
 
-    const tourData = {
-        lidarToPanoMatrix: lidarToPanoMatrix.toArray(),
-        stops: []
-    };
+    if (pcdFiles.length === 0 || imgFiles.length === 0) {
+        throw new Error('No PCD or image files found in the dataset directories.');
+    }
 
-    for (let i = 0; i < selectedIndices.length; i++) {
-        const idx = selectedIndices[i];
-        const record = camRecords[idx];
-        const pcdTimestamp = record.pcd_name.replace('.pcd', '');
-        const pcdTimeInSeconds = (BigInt(pcdTimestamp) / BigInt(1e9)) + '.' + (BigInt(pcdTimestamp) % BigInt(1e9));
-        const worldMatrix = findClosestPose(pcdTimeInSeconds, poseMap);
-        if (worldMatrix) {
-            tourData.stops.push({
-            image: `datasets/stitching/${record.image_name}`,
-            pcd: `datasets/pcd/${record.pcd_name}`,
-            worldMatrix: worldMatrix.toArray(),
-            });
+    // 3. Build the tour data structure
+    const tourStops = [];
+    for (const index in alignments) {
+        if (Object.hasOwnProperty.call(alignments, index)) {
+            const idx = parseInt(index, 10);
+            if (idx < imgFiles.length && idx < pcdFiles.length) {
+                tourStops.push({
+                    image: path.join(IMG_PATH, imgFiles[idx]).replace(/\\/g, '/'),
+                    pcd: path.join(PCD_PATH, pcdFiles[idx]).replace(/\\/g, '/'),
+                    matrix: alignments[index].map(n => parseFloat(n)) // Ensure numbers, not strings
+                });
+            } else {
+                console.warn(`Skipping alignment for index ${idx} as it's out of bounds.`);
+            }
         }
     }
 
-    fs.writeFileSync(OUTPUT_PATH, JSON.stringify(tourData, null, 2));
-    console.log(`Success! Tour data has been written to ${OUTPUT_PATH}`);
+    // 4. Write the output file
+    fs.writeFileSync(OUTPUT_PATH, JSON.stringify(tourStops, null, 2));
+
+    console.log(`Successfully generated tour.json with ${tourStops.length} stops.`);
+    console.log(`Output written to ${OUTPUT_PATH}`);
+
 } catch (error) {
-    console.error('An error occurred during tour generation:', error);
+    console.error('Failed to generate tour:', error.message);
+    process.exit(1); // Exit with an error code
 }

@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>WebXR Virtual Tour - PAIR360</title>
+    <style>
+        body { margin: 0; font-family: sans-serif; }
+        canvas { display: block; }
+        #ui {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 10;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 10px;
+            border-radius: 10px;
+            color: white;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        button {
+            padding: 10px 15px;
+            border: none;
+            background: #444;
+            color: white;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        button:disabled {
+            background: #222;
+            cursor: not-allowed;
+        }
+        #info {
+            font-size: 1.2em;
+        }
+    </style>
+</head>
+<body>
+<div id="ui">
+    <button id="prevBtn">Previous</button>
+    <div id="info">Stop 0 / 0</div>
+    <button id="nextBtn">Next</button>
+</div>
+<script type="module" src="/src/main.js"></script>
+</body>
+</html>
