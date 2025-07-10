@@ -1,4 +1,3 @@
-import * as THREE from 'three';
 import fs from 'fs';
 import path from 'path';
 
@@ -6,8 +5,7 @@ console.log('Starting tour generation script...');
 
 let pcdFiles = [];
 let imgFiles = [];
-const DATASET_PATH = path.resolve('public/datasets');
-const ALIGNMENTS_PATH = path.resolve('public/alignments.json'); // Expects alignments.json in the root
+const ALIGNMENTS_PATH = path.resolve('public/alignments.json');
 const OUTPUT_PATH = path.resolve('public/tour.json');
 const PCD_PATH = 'public/datasets/pcd/';
 const IMG_PATH = 'public/datasets/stitching/';
@@ -19,12 +17,6 @@ function getSortedFiles(dir, exts) {
     return filtered.sort();
 }
 
-/**
- * Extracts a list of files from a list.json file in the specified directory, which contains a single array of strings (file names.extensions).
- * If no list.json is found, it will return an empty array.
- * @param {} dir 
- * @param {*} exts 
- */
 function readFileList(dir, exts) {
     const listPath = path.join(dir, 'list.json');
     if (!fs.existsSync(listPath)) {
@@ -40,14 +32,12 @@ function readFileList(dir, exts) {
 }
 
 try {
-    // 1. Read the manually created alignments
     if (!fs.existsSync(ALIGNMENTS_PATH)) {
         throw new Error(`Alignments file not found at ${ALIGNMENTS_PATH}. Please run the alignment utility and save the file.`);
     }
     const alignments = JSON.parse(fs.readFileSync(ALIGNMENTS_PATH, 'utf-8'));
     console.log(`Loaded ${alignments.length} alignments.`);
 
-    // 2. Get the lists of files to match indices
     pcdFiles = readFileList(path.resolve(PCD_PATH), ['.pcd']);
     imgFiles = readFileList(path.resolve(IMG_PATH), IMAGE_EXTENSIONS);
 
@@ -55,10 +45,8 @@ try {
         throw new Error('No PCD or image files found in the dataset directories.');
     }
 
-    // 3. Build the tour data structure
     const tourStops = [];
     
-    // Process each alignment entry (new format is an array)
     for (let i = 0; i < alignments.length; i++) {
         const alignment = alignments[i];
         
@@ -66,15 +54,14 @@ try {
         const tourStop = {
             image: alignment.image,
             pcd: alignment.pcd,
-            matrix: alignment.matrix.map(n => parseFloat(n)) // Ensure numbers, not strings
+            matrix: alignment.matrix.map(n => parseFloat(n))
         };
         
-        // Process hotspots if they exist
         if (alignment.hotspots && alignment.hotspots.length > 0) {
             tourStop.hotspots = alignment.hotspots.map(hotspot => {
                 return {
-                    position: hotspot.position.map(n => parseFloat(n)), // Convert to numbers
-                    targetScene: hotspot.targetScene // Index of the target scene
+                    position: hotspot.position.map(n => parseFloat(n)),
+                    targetScene: hotspot.targetScene
                 };
             });
         }
@@ -82,7 +69,6 @@ try {
         tourStops.push(tourStop);
     }
 
-    // 4. Write the output file
     fs.writeFileSync(OUTPUT_PATH, JSON.stringify(tourStops, null, 2));
 
     console.log(`Successfully generated tour.json with ${tourStops.length} stops.`);
@@ -90,5 +76,5 @@ try {
 
 } catch (error) {
     console.error('Failed to generate tour:', error.message);
-    process.exit(1); // Exit with an error code
+    process.exit(1);
 }
