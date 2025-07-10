@@ -2,7 +2,6 @@
   "dependencies": {
     "csv-parse": "^5.6.0",
     "three": "^0.178.0",
-    "three-mesh-ui": "^6.5.4",
     "three-stdlib": "^2.36.0"
   },
   "name": "3d-image-mapper",
