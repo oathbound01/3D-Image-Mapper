@@ -4,69 +4,490 @@
   <meta charset="UTF-8">
   <title>PCD–Panorama Alignment Tool</title>
   <style>
-    body { margin: 0; overflow: hidden; }
-    #controls {
-      position: absolute; top: 10px; left: 10px; background: rgba(255,255,255,0.95); padding: 15px; border-radius: 8px;
-      font-family: sans-serif; z-index: 10; max-width: 350px;
+    * {
+      box-sizing: border-box;
     }
-    #matrixOutput { font-family: monospace; font-size: 0.9em; margin-top: 10px; }
-    label { display: block; margin-top: 5px; }
-    input[type=number] { width: 120px; }
-    button { margin-top: 10px; }
-    #pairInfo { margin-top: 10px; font-weight: bold; }
-    /* Hotspot styles */
-    .hotspot-section { margin-top: 15px; border-top: 1px solid #ddd; padding-top: 10px; }
-    #hotspotList { margin-top: 10px; max-height: 100px; overflow-y: auto; }
-    .hotspot-item { margin-bottom: 5px; display: flex; justify-content: space-between; }
-    .hotspot-item button { margin-top: 0; margin-left: 5px; }
+
+    body { 
+      margin: 0; 
+      overflow: hidden; 
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+
+    #controls {
+      position: absolute; 
+      top: 15px; 
+      left: 15px; 
+      background: rgba(255, 255, 255, 0.98);
+      backdrop-filter: blur(10px);
+      padding: 18px; 
+      border-radius: 12px;
+      box-shadow: 0 6px 25px rgba(0, 0, 0, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      z-index: 10; 
+      max-width: 320px;
+      max-height: 92vh;
+      overflow-y: auto;
+      transition: all 0.3s ease;
+    }
+
+    #controls::-webkit-scrollbar {
+      width: 4px;
+    }
+
+    #controls::-webkit-scrollbar-track {
+      background: rgba(0, 0, 0, 0.05);
+      border-radius: 2px;
+    }
+
+    #controls::-webkit-scrollbar-thumb {
+      background: rgba(102, 126, 234, 0.4);
+      border-radius: 2px;
+    }
+
+    #controls::-webkit-scrollbar-thumb:hover {
+      background: rgba(102, 126, 234, 0.6);
+    }
+
+    h3, h4 {
+      color: #2c3e50;
+      margin: 12px 0 8px 0;
+      font-weight: 600;
+      letter-spacing: 0.3px;
+      font-size: 14px;
+    }
+
+    h3 {
+      font-size: 16px;
+      border-bottom: 2px solid #667eea;
+      padding-bottom: 6px;
+      margin-bottom: 12px;
+    }
+
+    #pairInfo { 
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      color: white;
+      padding: 10px 12px;
+      border-radius: 8px;
+      font-weight: 600;
+      text-align: center;
+      margin: 10px 0;
+      box-shadow: 0 3px 12px rgba(102, 126, 234, 0.3);
+      font-size: 13px;
+    }
+
+    #pairInfo h2 {
+      margin: 0 0 8px 0;
+      font-size: 16px;
+      color: white;
+    }
+
+    label { 
+      display: block; 
+      margin: 8px 0 4px 0;
+      color: #34495e;
+      font-weight: 500;
+      font-size: 12px;
+    }
+
+    input[type=number], select {
+      width: 100%;
+      padding: 8px 10px;
+      border: 1px solid #e3e8f0;
+      border-radius: 6px;
+      font-size: 13px;
+      transition: all 0.3s ease;
+      background: white;
+      font-family: inherit;
+      margin-bottom: 4px;
+    }
+
+    input[type=number]:focus, select:focus {
+      outline: none;
+      border-color: #667eea;
+      box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.1);
+      transform: translateY(-1px);
+    }
+
+    button {
+      width: 100%;
+      padding: 8px 12px;
+      margin: 4px 0;
+      border: none;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      font-family: inherit;
+      position: relative;
+      overflow: hidden;
+    }
+
+    button:before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+      transition: left 0.5s;
+    }
+
+    button:hover:before {
+      left: 100%;
+    }
+
+    #resetBtn {
+      background: linear-gradient(135deg, #ff6b6b, #ee5a52);
+      color: white;
+      box-shadow: 0 4px 15px rgba(255, 107, 107, 0.3);
+    }
+
+    #resetBtn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(255, 107, 107, 0.4);
+    }
+
+    #exportBtn {
+      background: linear-gradient(135deg, #4ecdc4, #44a08d);
+      color: white;
+      box-shadow: 0 4px 15px rgba(78, 205, 196, 0.3);
+    }
+
+    #exportBtn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(78, 205, 196, 0.4);
+    }
+
+    #nextPairBtn {
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      color: white;
+      box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+    }
+
+    #nextPairBtn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+    }
+
+    #downloadAllBtn {
+      background: linear-gradient(135deg, #ffa726, #fb8c00);
+      color: white;
+      box-shadow: 0 4px 15px rgba(255, 167, 38, 0.3);
+    }
+
+    #downloadAllBtn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(255, 167, 38, 0.4);
+    }
+
+    #addHotspotBtn {
+      background: linear-gradient(135deg, #9c27b0, #8e24aa);
+      color: white;
+      box-shadow: 0 4px 15px rgba(156, 39, 176, 0.3);
+    }
+
+    #addHotspotBtn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(156, 39, 176, 0.4);
+    }
+
+    #hotspotList { 
+      margin-top: 8px;
+      max-height: 120px;
+      overflow-y: auto;
+      border: 1px solid #e3e8f0;
+      border-radius: 6px;
+      padding: 6px;
+      background: #f8f9fa;
+    }
+
+    .hotspot-item { 
+      margin-bottom: 6px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 6px 8px;
+      background: white;
+      border-radius: 4px;
+      border: 1px solid #e3e8f0;
+      transition: all 0.3s ease;
+      font-size: 12px;
+    }
+
+    .hotspot-item:hover {
+      border-color: #667eea;
+      transform: translateY(-1px);
+      box-shadow: 0 2px 6px rgba(102, 126, 234, 0.1);
+    }
+
+    .hotspot-item button { 
+      margin: 0;
+      margin-left: 6px;
+      width: auto;
+      padding: 4px 8px;
+      font-size: 11px;
+      background: linear-gradient(135deg, #ff6b6b, #ee5a52);
+    }
+
     /* Hotspot marker in 3D scene */
     .hotspot-marker {
       position: absolute;
       width: 20px;
       height: 20px;
       border-radius: 50%;
-      background-color: rgba(255, 0, 0, 0.7);
+      background: radial-gradient(circle, #ff6b6b, #ee5a52);
       border: 2px solid white;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
       transform: translate(-50%, -50%);
       cursor: pointer;
       z-index: 5;
+      transition: all 0.3s ease;
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0% { box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3), 0 0 0 0 rgba(255, 107, 107, 0.7); }
+      50% { box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3), 0 0 0 8px rgba(255, 107, 107, 0); }
+      100% { box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3), 0 0 0 0 rgba(255, 107, 107, 0); }
+    }
+
+    .hotspot-marker:hover {
+      transform: translate(-50%, -50%) scale(1.1);
     }
     
     /* Style for highlighting hotspot placement mode */
     .hotspot-mode-active {
       font-weight: bold;
-      color: #ff3300;
+      color: #9c27b0;
+      text-shadow: 0 0 8px rgba(156, 39, 176, 0.3);
+    }
+
+    .back-button {
+      display: inline-flex;
+      align-items: center;
+      margin-bottom: 10px;
+      padding: 8px 12px;
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      color: white;
+      text-decoration: none;
+      border-radius: 6px;
+      font-weight: 600;
+      transition: all 0.3s ease;
+      box-shadow: 0 3px 12px rgba(102, 126, 234, 0.3);
+      font-size: 12px;
+    }
+
+    .back-button:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+      text-decoration: none;
+      color: white;
+    }
+
+    .back-button::before {
+      content: '←';
+      margin-right: 6px;
+      font-size: 14px;
+    }
+
+    /* Control groups */
+    .control-group {
+      background: rgba(102, 126, 234, 0.04);
+      padding: 10px;
+      border-radius: 8px;
+      margin: 8px 0;
+      border: 1px solid rgba(102, 126, 234, 0.1);
+    }
+
+    .control-group h4 {
+      margin: 0 0 8px 0;
+    }
+
+    /* Grid layouts for compact controls */
+    .input-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 6px;
+      margin-top: 4px;
+    }
+
+    .input-col {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .input-col label {
+      margin: 0 0 2px 0;
+      font-size: 11px;
+      font-weight: 600;
+    }
+
+    .input-col input {
+      margin-bottom: 0;
+      padding: 6px 8px;
+      font-size: 12px;
+    }
+
+    .button-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+      margin: 10px 0;
+    }
+
+    .button-grid button {
+      margin: 0;
+      padding: 8px 10px;
+      font-size: 11px;
+    }
+
+    /* Responsive adjustments */
+    @media (max-width: 480px) {
+      #controls {
+        max-width: calc(100vw - 30px);
+        left: 15px;
+        right: 15px;
+      }
+    }
+
+    /* Loading animation */
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    .loading {
+      display: inline-block;
+      width: 16px;
+      height: 16px;
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      border-radius: 50%;
+      border-top-color: white;
+      animation: spin 1s ease-in-out infinite;
+      margin-right: 8px;
+    }
+
+    /* Toast notification system */
+    .toast {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: linear-gradient(135deg, #4ecdc4, #44a08d);
+      color: white;
+      padding: 12px 18px;
+      border-radius: 8px;
+      box-shadow: 0 4px 15px rgba(78, 205, 196, 0.3);
+      font-size: 14px;
+      font-weight: 600;
+      z-index: 1000;
+      transform: translateX(100%);
+      transition: transform 0.3s ease;
+    }
+
+    .toast.show {
+      transform: translateX(0);
+    }
+
+    .toast.success {
+      background: linear-gradient(135deg, #4ecdc4, #44a08d);
+      box-shadow: 0 4px 15px rgba(78, 205, 196, 0.3);
+    }
+
+    .toast.info {
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+    }
+
+    .toast.warning {
+      background: linear-gradient(135deg, #ffa726, #fb8c00);
+      box-shadow: 0 4px 15px rgba(255, 167, 38, 0.3);
+    }
+
+    .toast.error {
+      background: linear-gradient(135deg, #ff6b6b, #ee5a52);
+      box-shadow: 0 4px 15px rgba(255, 107, 107, 0.3);
+    }
+
+    /* Status indicator */
+    .status-indicator {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      margin-left: 6px;
+      background: white;
+      transition: all 0.3s ease;
+      box-shadow: 0 0 6px rgba(255, 255, 255, 0.8);
+    }
+
+    .status-indicator.saved {
+      background: #4ecdc4;
+      box-shadow: 0 0 8px rgba(78, 205, 196, 0.5);
     }
   </style>
 </head>
 <body>
   <div id="controls">
-    <label>Initial transform file:
-      <input type="file" id="initTransformInput" accept=".json">
-    </label>
+    <a class="back-button" href="/">Back to main menu</a>
     <div id="pairInfo"></div>
-    <label>Rotate X: <input type="number" value="0" id="rotX" step="1"></label>
-    <label>Rotate Y: <input type="number" value="0" id="rotY" step="1"></label>
-    <label>Rotate Z: <input type="number" value="0" id="rotZ" step="1"></label>
-    <label>Translate X: <input type="number" value="0" step="0.1" id="transX"></label>
-    <label>Translate Y: <input type="number" value="0" step="0.1" id="transY"></label>
-    <label>Translate Z: <input type="number" value="0" step="0.1" id="transZ"></label>
-    <label>Scale: <input type="number" value="1" step="0.1" min="0" id="scale"></label>
-    <button id="resetBtn">Reset</button>
-    <button id="exportBtn">Export matrix for this pair</button>
-    <button id="nextPairBtn">Next pair</button>
-    <button id="downloadAllBtn">Download all alignments</button>
-    <div id="matrixOutput"></div>
     
+    <!-- Transform Controls in compact layout -->
+    <div class="control-group">
+      <h4>🔄 Rotation (°)</h4>
+      <div class="input-row">
+        <div class="input-col">
+          <label>X: <input type="number" value="0" id="rotX" step="1" placeholder="0"></label>
+        </div>
+        <div class="input-col">
+          <label>Y: <input type="number" value="0" id="rotY" step="1" placeholder="0"></label>
+        </div>
+        <div class="input-col">
+          <label>Z: <input type="number" value="0" id="rotZ" step="1" placeholder="0"></label>
+        </div>
+      </div>
+    </div>
+
+    <div class="control-group">
+      <h4>📐 Translation</h4>
+      <div class="input-row">
+        <div class="input-col">
+          <label>X: <input type="number" value="0" step="0.1" id="transX" placeholder="0.0"></label>
+        </div>
+        <div class="input-col">
+          <label>Y: <input type="number" value="0" step="0.1" id="transY" placeholder="0.0"></label>
+        </div>
+        <div class="input-col">
+          <label>Z: <input type="number" value="0" step="0.1" id="transZ" placeholder="0.0"></label>
+        </div>
+      </div>
+    </div>
+
+    <div class="control-group">
+      <h4>🔍 Scale</h4>
+      <label>Scale: <input type="number" value="1" step="0.1" min="0" id="scale" placeholder="1.0"></label>
+    </div>
+
     <!-- Hotspot Controls -->
     <div class="hotspot-section">
-      <h3>Hotspots</h3>
-      <button id="addHotspotBtn">Add hotspot</button>
-      <div>
-        <label for="targetSceneSelect">Target scene:</label>
-        <select id="targetSceneSelect"></select>
-      </div>
+      <h3>📍 Hotspots</h3>
+      <label for="targetSceneSelect">🎯 Target:</label>
+      <select id="targetSceneSelect">
+        <option value="">Select target scene...</option>
+      </select>
+      <button id="addHotspotBtn">✚ Add hotspot</button>
       <div id="hotspotList"></div>
+    </div>
+
+    <!-- Action Buttons in grid -->
+    <div class="button-grid">
+      <button id="resetBtn">🔄 Reset values</button>
+      <button id="exportBtn" title="Save current pair configuration and hotspots to memory">💾 Save config<span class="status-indicator" id="saveStatus"></span></button>
+      <button id="nextPairBtn">⏭️ Next pair</button>
+      <button id="downloadAllBtn" title="Download all saved configurations as JSON file">📥 Download JSON</button>
     </div>
   </div>
   <script type="module" src="scripts/alignment.js"></script>

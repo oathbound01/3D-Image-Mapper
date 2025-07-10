@@ -18,10 +18,10 @@ const infoDiv = document.getElementById("info");
 // --- Hover marker setup ---
 let hoverMarker;
 function createHoverMarker() {
-  const geometry = new THREE.SphereGeometry(0.15, 16, 16);
+  const geometry = new THREE.SphereGeometry(0.25, 20, 20);
   const material = new THREE.MeshBasicMaterial({
-    color: 0x00ff00,
-    opacity: 0.7,
+    color: 0xffffff,
+    opacity: 0.6,
     transparent: true,
   });
   hoverMarker = new THREE.Mesh(geometry, material);
@@ -31,10 +31,36 @@ function createHoverMarker() {
 
 // --- Click/drag detection ---
 let mouseDownPos = null;
+let mouseMoved = false;
 
 // --- Raycaster for interactions ---
 const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
+
+// Toast notification system
+function showToast(message, type = 'success', duration = 3000) {
+  // Remove existing toast if any
+  const existingToast = document.querySelector('.toast');
+  if (existingToast) {
+    existingToast.remove();
+  }
+  
+  // Create new toast
+  const toast = document.createElement('div');
+  toast.className = `toast ${type}`;
+  toast.textContent = message;
+  
+  document.body.appendChild(toast);
+  
+  // Show toast with animation
+  setTimeout(() => toast.classList.add('show'), 100);
+  
+  // Hide toast after duration
+  setTimeout(() => {
+    toast.classList.remove('show');
+    setTimeout(() => toast.remove(), 300);
+  }, duration);
+}
 
 init();
 
@@ -46,7 +72,7 @@ async function init() {
     }
     tourData = await response.json();
   } catch (error) {
-    infoDiv.textContent = "Error: Could not load tour data.";
+    showToast('❌ Error: Could not load tour data', 'error', 5000);
     console.error("Failed to fetch tour data:", error);
     return;
   }
@@ -76,7 +102,59 @@ async function init() {
   controls.enableDamping = true;
 
   document.body.appendChild(renderer.domElement);
-  document.body.appendChild(VRButton.createButton(renderer));
+  
+  // Create VR button wrapper for better positioning control
+  const vrWrapper = document.createElement('div');
+  vrWrapper.style.position = 'fixed';
+  vrWrapper.style.bottom = '80px';
+  vrWrapper.style.left = '20px';
+  vrWrapper.style.zIndex = '15';
+  vrWrapper.style.pointerEvents = 'auto';
+  
+  // Create and style VR button
+  const vrButton = VRButton.createButton(renderer);
+  
+  // Reset VR button styles to prevent conflicts
+  vrButton.style.setProperty('position', 'relative', 'important');
+  vrButton.style.setProperty('top', 'auto', 'important');
+  vrButton.style.setProperty('bottom', 'auto', 'important');
+  vrButton.style.setProperty('left', 'auto', 'important');
+  vrButton.style.setProperty('right', 'auto', 'important');
+  vrButton.style.setProperty('transform', 'none', 'important');
+  vrButton.style.setProperty('margin', '0', 'important');
+  
+  // Style the button
+  vrButton.style.background = 'linear-gradient(135deg, #667eea, #764ba2)';
+  vrButton.style.border = 'none';
+  vrButton.style.borderRadius = '10px';
+  vrButton.style.padding = '12px 18px';
+  vrButton.style.color = 'white';
+  vrButton.style.fontWeight = '600';
+  vrButton.style.fontSize = '14px';
+  vrButton.style.fontFamily = "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif";
+  vrButton.style.boxShadow = '0 4px 15px rgba(102, 126, 234, 0.3)';
+  vrButton.style.transition = 'all 0.3s ease';
+  vrButton.style.cursor = 'pointer';
+  vrButton.style.width = 'auto';
+  vrButton.style.height = 'auto';
+  vrButton.style.minWidth = 'auto';
+  vrButton.style.minHeight = 'auto';
+  vrButton.style.maxWidth = 'none';
+  vrButton.style.maxHeight = 'none';
+  
+  // Add hover effect
+  vrButton.addEventListener('mouseenter', () => {
+    vrButton.style.transform = 'translateY(-2px)';
+    vrButton.style.boxShadow = '0 6px 20px rgba(102, 126, 234, 0.4)';
+  });
+  vrButton.addEventListener('mouseleave', () => {
+    vrButton.style.transform = 'translateY(0)';
+    vrButton.style.boxShadow = '0 4px 15px rgba(102, 126, 234, 0.3)';
+  });
+  
+  // Add button to wrapper and wrapper to document
+  vrWrapper.appendChild(vrButton);
+  document.body.appendChild(vrWrapper);
 
   window.addEventListener("resize", onWindowResize);
   prevBtn.addEventListener("click", () => navigate(-1));
@@ -90,7 +168,7 @@ async function init() {
   if (tourData.length > 0) {
     await loadStop(0);
   } else {
-    infoDiv.textContent = "No stops in tour data.";
+    showToast('⚠️ No stops found in tour data', 'warning', 5000);
   }
 
   renderer.setAnimationLoop(animate);
@@ -146,7 +224,7 @@ async function loadStop(index) {
 
     updateUI();
   } catch (error) {
-    infoDiv.textContent = `Error loading stop ${index + 1}.`;
+    showToast(`❌ Error loading stop ${index + 1}`, 'error', 4000);
     console.error(`Failed to load stop ${index + 1}:`, error);
   }
 }
@@ -154,15 +232,43 @@ async function loadStop(index) {
 // Create hotspot markers
 function createHotspots(hotspots, pcdMatrix) {
   hotspots.forEach((hotspot, idx) => {
-    const geometry = new THREE.SphereGeometry(0.1, 16, 16);
-    const material = new THREE.MeshBasicMaterial({
-      color: 0xff0000,
-      opacity: 0.7,
+    // Create hotspot group for complex geometry
+    const hotspotGroup = new THREE.Group();
+    
+    // Main sphere
+    const mainGeometry = new THREE.SphereGeometry(0.15, 20, 20);
+    const mainMaterial = new THREE.MeshBasicMaterial({
+      color: 0x4ecdc4,
+      opacity: 0.8,
       transparent: true,
     });
-
-    const marker = new THREE.Mesh(geometry, material);
-
+    const mainSphere = new THREE.Mesh(mainGeometry, mainMaterial);
+    
+    // Outer glow ring
+    const ringGeometry = new THREE.RingGeometry(0.18, 0.22, 20);
+    const ringMaterial = new THREE.MeshBasicMaterial({
+      color: 0x44a08d,
+      opacity: 0.4,
+      transparent: true,
+      side: THREE.DoubleSide,
+    });
+    const ring = new THREE.Mesh(ringGeometry, ringMaterial);
+    ring.lookAt(camera.position);
+    
+    // Inner core
+    const coreGeometry = new THREE.SphereGeometry(0.08, 16, 16);
+    const coreMaterial = new THREE.MeshBasicMaterial({
+      color: 0xffffff,
+      opacity: 0.9,
+      transparent: true,
+    });
+    const core = new THREE.Mesh(coreGeometry, coreMaterial);
+    
+    // Add all parts to group
+    hotspotGroup.add(mainSphere);
+    hotspotGroup.add(ring);
+    hotspotGroup.add(core);
+    
     // Set position based on hotspot data
     const position = new THREE.Vector3(
       hotspot.position[0],
@@ -171,16 +277,21 @@ function createHotspots(hotspots, pcdMatrix) {
     );
 
     position.applyMatrix4(pcdMatrix);
-    marker.position.copy(position);
+    hotspotGroup.position.copy(position);
 
-    marker.userData = {
+    hotspotGroup.userData = {
       type: "hotspot",
       targetSceneIndex: hotspot.targetScene,
     };
 
-    marker.name = `hotspot-${idx}`;
+    hotspotGroup.name = `hotspot-${idx}`;
+    
+    // Store references to parts for animation
+    hotspotGroup.userData.mainSphere = mainSphere;
+    hotspotGroup.userData.ring = ring;
+    hotspotGroup.userData.core = core;
 
-    hotspotObjects.add(marker);
+    hotspotObjects.add(hotspotGroup);
   });
 }
 
@@ -214,10 +325,35 @@ function animate() {
   controls.update();
 
   const time = Date.now() * 0.001;
-  hotspotObjects.children.forEach((hotspot) => {
-    const scale =
-      1 + 0.2 * Math.sin(time * 3 + parseInt(hotspot.name.split("-")[1]) * 0.5);
-    hotspot.scale.set(scale, scale, scale);
+  hotspotObjects.children.forEach((hotspot, index) => {
+    // Breathing animation for main sphere
+    const breatheScale = 1 + 0.15 * Math.sin(time * 2 + index * 0.8);
+    const mainSphere = hotspot.userData.mainSphere;
+    const ring = hotspot.userData.ring;
+    const core = hotspot.userData.core;
+    
+    if (mainSphere) {
+      mainSphere.scale.set(breatheScale, breatheScale, breatheScale);
+    }
+    
+    // Rotating ring
+    if (ring) {
+      ring.rotation.z += 0.01;
+      ring.lookAt(camera.position);
+    }
+    
+    // Pulsing core
+    if (core) {
+      const pulseScale = 1 + 0.3 * Math.sin(time * 4 + index * 1.2);
+      core.scale.set(pulseScale, pulseScale, pulseScale);
+    }
+    
+    // Floating animation
+    const originalY = hotspot.userData.originalY || hotspot.position.y;
+    if (!hotspot.userData.originalY) {
+      hotspot.userData.originalY = originalY;
+    }
+    hotspot.position.y = originalY + 0.05 * Math.sin(time * 1.5 + index * 0.5);
   });
 
   renderer.render(scene, camera);
@@ -247,9 +383,14 @@ function onSceneClick(event) {
 
   raycaster.setFromCamera(mouse, camera);
 
-  const hotspotIntersects = raycaster.intersectObjects(hotspotObjects.children);
+  const hotspotIntersects = raycaster.intersectObjects(hotspotObjects.children, true);
   if (hotspotIntersects.length > 0) {
-    const hotspot = hotspotIntersects[0].object;
+    // Find the parent hotspot group
+    let hotspot = hotspotIntersects[0].object;
+    while (hotspot.parent && !hotspot.userData.type) {
+      hotspot = hotspot.parent;
+    }
+    
     if (hotspot.userData && hotspot.userData.type === "hotspot") {
       const targetSceneIndex = hotspot.userData.targetSceneIndex;
       if (navigateToScene(targetSceneIndex)) {
@@ -283,9 +424,14 @@ function onMouseMoveHover(event) {
 
   raycaster.setFromCamera(mouse, camera);
 
-  const hotspotIntersects = raycaster.intersectObjects(hotspotObjects.children);
+  const hotspotIntersects = raycaster.intersectObjects(hotspotObjects.children, true);
   if (hotspotIntersects.length > 0) {
-    const hotspot = hotspotIntersects[0].object;
+    // Find the parent hotspot group
+    let hotspot = hotspotIntersects[0].object;
+    while (hotspot.parent && !hotspot.userData.type) {
+      hotspot = hotspot.parent;
+    }
+    
     if (hotspot.userData && hotspot.userData.type === "hotspot") {
       const targetSceneIndex = hotspot.userData.targetSceneIndex;
 

@@ -24,6 +24,7 @@ let hotspotMarkers = [];
 let camera, scene, renderer, controls;
 let panoSphere, pointCloud;
 let pcdGroup = new THREE.Group();
+let isSystemUpdate = false; // Flag to track system updates vs user changes
 
 window.addEventListener('DOMContentLoaded', init);
 
@@ -38,25 +39,6 @@ async function fetchFileList(dir, exts) {
 }
 
 async function init() {
-  document.getElementById('initTransformInput').addEventListener('change', async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const text = await file.text();
-    try {
-      const data = JSON.parse(text);
-      if (Array.isArray(data)) {
-        initialTransform = data[0];
-      } else {
-        initialTransform = data;
-      }
-      alert('Initial transformation loaded.');
-      await loadPair(currentIndex);
-    } catch (err) {
-      alert('Failed to parse initial transformation file.');
-      initialTransform = null;
-    }
-  });
-
   pcdFiles = await fetchFileList(PCD_PATH, '.pcd');
   imgFiles = await fetchFileList(IMG_PATH, IMAGE_EXTENSIONS);
 
@@ -70,7 +52,7 @@ async function init() {
   scene.background = new THREE.Color(0x222222);
 
   camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 2000);
-  camera.position.set(0, 0, 2);
+  camera.position.set(0, 0, 0);
 
   renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setSize(window.innerWidth, window.innerHeight);
@@ -78,6 +60,7 @@ async function init() {
 
   controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
+  controls.target.set(0, 0, 0.00001);
   controls.listenToKeyEvents(document.createElement('div'));
 
   window.addEventListener('resize', onWindowResize);
@@ -88,18 +71,6 @@ async function init() {
   setupHotspotControls();
   
   animate();
-}
-
-function updateMatrixDisplay() {
-  const mat = new THREE.Matrix4();
-  mat.compose(
-    pcdGroup.position,
-    pcdGroup.quaternion,
-    pcdGroup.scale
-  );
-  document.getElementById('matrixOutput').textContent =
-    'Matrix4:\n' +
-    mat.toArray().map(n => n.toFixed(6)).join(', ');
 }
 
 function updateTransform() {
@@ -137,10 +108,20 @@ function updateTransform() {
   if (pointCloud) {
     pointCloud.material.size = scale * 0.05;
   }
-
-  updateMatrixDisplay();
   
   updateHotspotPositions();
+  
+  // Mark as unsaved when transforms change (but not during system updates)
+  if (!isSystemUpdate && (
+      document.getElementById('rotX').value !== '0' || 
+      document.getElementById('rotY').value !== '0' || 
+      document.getElementById('rotZ').value !== '0' ||
+      document.getElementById('transX').value !== '0' ||
+      document.getElementById('transY').value !== '0' ||
+      document.getElementById('transZ').value !== '0' ||
+      document.getElementById('scale').value !== '1')) {
+    markAsUnsaved();
+  }
 }
 
 
@@ -219,7 +200,7 @@ function onSceneClick(event) {
 function addHotspot(position) {
   const targetSceneSelect = document.getElementById('targetSceneSelect');
   if (targetSceneSelect.options.length === 0) {
-    alert('No target scenes available for hotspot');
+    showToast('⚠️ No target scenes available for hotspot', 'warning');
     return;
   }
   
@@ -268,6 +249,9 @@ function addHotspot(position) {
   createHotspotMarker(hotspot);
   
   updateHotspotList();
+  
+  // Mark as unsaved when hotspot is added
+  markAsUnsaved();
 }
 
 function createHotspotMarker(hotspot) {
@@ -355,6 +339,9 @@ function deleteHotspot(hotspotId) {
   }
   
   updateHotspotList();
+  
+  // Mark as unsaved when hotspot is deleted
+  markAsUnsaved();
 }
 
 function setupControls(pairCount) {
@@ -376,10 +363,13 @@ function setupControls(pairCount) {
   });
 
   resetBtn.addEventListener('click', () => {
+    isSystemUpdate = true;
     rotX.value = rotY.value = rotZ.value = 0;
     transX.value = transY.value = transZ.value = 0;
     scale.value = 1;
     updateTransform();
+    resetSaveStatus();
+    isSystemUpdate = false;
   });
 
   exportBtn.addEventListener('click', () => {
@@ -404,14 +394,15 @@ function setupControls(pairCount) {
       }));
     }
     
-    alert('Matrix and hotspots for this pair saved in memory.');
+    showToast('✅ Configuration and hotspots saved to memory!', 'success');
+    updateSaveStatus(true);
   });
 
   nextPairBtn.addEventListener('click', async () => {
     exportBtn.click();
     currentIndex++;
     if (currentIndex >= pairCount) {
-      alert('All pairs done!');
+      showToast('🎉 All pairs completed! Use "Download All" to save your work.', 'info', 4000);
       currentIndex = pairCount - 1;
       return;
     }
@@ -419,6 +410,20 @@ function setupControls(pairCount) {
   });
 
   downloadAllBtn.addEventListener('click', () => {
+    // Check if all pairs have been saved
+    const totalPairs = Math.min(pcdFiles.length, imgFiles.length);
+    const savedPairs = Object.keys(alignments).filter(key => alignments[key] && alignments[key].matrix).length;
+    
+    if (savedPairs < totalPairs) {
+      const message = `Warning: Only ${savedPairs} out of ${totalPairs} pairs have been saved. Do you want to download the incomplete configuration?`;
+      if (!confirm(message)) {
+        return;
+      }
+      showToast(`⚠️ Downloaded incomplete configuration (${savedPairs}/${totalPairs} pairs)`, 'warning', 4000);
+    } else {
+      showToast('✅ Downloaded complete configuration for all pairs!', 'success');
+    }
+    
     const finalOutput = [];
     
     for (let i = 0; i < Math.min(pcdFiles.length, imgFiles.length); i++) {
@@ -448,14 +453,24 @@ function setupControls(pairCount) {
   });
 
   function updatePairInfo() {
-    pairInfo.textContent = `Pair ${currentIndex + 1} / ${pairCount}: ${imgFiles[currentIndex]} + ${pcdFiles[currentIndex]}`;
-    
+    pairInfo.innerHTML = `<h2>Pair ${currentIndex + 1} / ${pairCount}</h2>`;
+    pairInfo.innerHTML += `<div style="display: flex; align-items: center; margin-bottom: 0.5rem;"><span style="margin-right: 0.5rem; font-size: 1.2em;">🖼️</span> ${imgFiles[currentIndex]}</div>`;
+    pairInfo.innerHTML += `<div style="display: flex; align-items: center;"><span style="margin-right: 0.5rem; font-size: 1.2em;">🌐</span> ${pcdFiles[currentIndex]}</div>`;
+
+
     hotspotMode = false;
     if (addHotspotBtn) {
-      addHotspotBtn.textContent = "Add Hotspot";
+      addHotspotBtn.textContent = "✚ Add hotspot";
     }
     if (renderer) {
       renderer.domElement.style.cursor = 'auto';
+    }
+    
+    // Check if current pair has saved configuration
+    if (alignments[currentIndex] && alignments[currentIndex].matrix) {
+      updateSaveStatus(true);
+    } else {
+      updateSaveStatus(false);
     }
   }
 
@@ -487,8 +502,6 @@ async function loadPair(idx) {
   const image = imgFiles[idx];
   const pcd = pcdFiles[idx];
 
-  document.getElementById('pairInfo').textContent = `Pair ${idx + 1}: ${image} + ${pcd}`;
-
   const panoTexture = await new THREE.TextureLoader().loadAsync(IMG_PATH + image);
   panoSphere = new THREE.Mesh(
     new THREE.SphereGeometry(50, 60, 40).scale(-1, 1, 1),
@@ -507,11 +520,13 @@ async function loadPair(idx) {
   pcdGroup.add(pointCloud);
   scene.add(pcdGroup);
 
+  isSystemUpdate = true;
   ['rotX','rotY','rotZ','transX','transY','transZ'].forEach(id => {
     document.getElementById(id).value = 0;
   });
 
   updateTransform();
+  isSystemUpdate = false;
   
   populateTargetScenes();
   
@@ -522,6 +537,7 @@ async function loadPair(idx) {
   }
   
   updateHotspotList();
+  resetSaveStatus();
 }
 
 function onWindowResize() {
@@ -534,4 +550,51 @@ function animate() {
   controls.update();
   renderer.render(scene, camera);
   requestAnimationFrame(animate);
+}
+
+// Toast notification system
+function showToast(message, type = 'success', duration = 3000) {
+  // Remove existing toast if any
+  const existingToast = document.querySelector('.toast');
+  if (existingToast) {
+    existingToast.remove();
+  }
+  
+  // Create new toast
+  const toast = document.createElement('div');
+  toast.className = `toast ${type}`;
+  toast.textContent = message;
+  
+  document.body.appendChild(toast);
+  
+  // Show toast with animation
+  setTimeout(() => toast.classList.add('show'), 100);
+  
+  // Hide toast after duration
+  setTimeout(() => {
+    toast.classList.remove('show');
+    setTimeout(() => toast.remove(), 300);
+  }, duration);
+}
+
+// Function to update save status indicator
+function updateSaveStatus(saved = false) {
+  const indicator = document.getElementById('saveStatus');
+  if (indicator) {
+    if (saved) {
+      indicator.classList.add('saved');
+    } else {
+      indicator.classList.remove('saved');
+    }
+  }
+}
+
+// Reset save status when loading a new pair or resetting
+function resetSaveStatus() {
+  updateSaveStatus(false);
+}
+
+// Mark as unsaved when changes are made
+function markAsUnsaved() {
+  updateSaveStatus(false);
 }
