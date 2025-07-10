@@ -1,49 +1,46 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>WebXR Virtual Tour - PAIR360</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Image Mapper</title>
     <style>
-        body { margin: 0; font-family: sans-serif; }
-        canvas { display: block; }
-        #ui {
-            position: absolute;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            z-index: 10;
-            background: rgba(0, 0, 0, 0.5);
-            padding: 10px;
-            border-radius: 10px;
-            color: white;
+        body {
+            font-family: sans-serif;
             display: flex;
+            justify-content: center;
             align-items: center;
-            gap: 15px;
+            height: 100vh;
+            background-color: #f0f0f0;
+            margin: 0;
         }
-        button {
-            padding: 10px 15px;
-            border: none;
-            background: #444;
+        .container {
+            text-align: center;
+        }
+        h1 {
+            margin-bottom: 40px;
+        }
+        .button {
+            display: inline-block;
+            padding: 15px 30px;
+            font-size: 18px;
+            margin: 10px;
+            text-decoration: none;
             color: white;
+            background-color: #007bff;
             border-radius: 5px;
-            cursor: pointer;
+            transition: background-color 0.3s;
         }
-        button:disabled {
-            background: #222;
-            cursor: not-allowed;
-        }
-        #info {
-            font-size: 1.2em;
+        .button:hover {
+            background-color: #0056b3;
         }
     </style>
 </head>
 <body>
-<div id="ui">
-    <button id="prevBtn">Previous</button>
-    <div id="info">Stop 0 / 0</div>
-    <button id="nextBtn">Next</button>
-</div>
-<script type="module" src="/src/main.js"></script>
+    <div class="container">
+        <h1>3D Image Mapper</h1>
+        <a href="alignment.html" class="button">Alignment tool</a>
+        <a href="tour.html" class="button">View tour</a>
+    </div>
 </body>
 </html>

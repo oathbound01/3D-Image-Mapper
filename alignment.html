@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>PCD–Panorama Alignment Tool</title>
+  <style>
+    body { margin: 0; overflow: hidden; }
+    #controls {
+      position: absolute; top: 10px; left: 10px; background: rgba(255,255,255,0.95); padding: 15px; border-radius: 8px;
+      font-family: sans-serif; z-index: 10; max-width: 350px;
+    }
+    #matrixOutput { font-family: monospace; font-size: 0.9em; margin-top: 10px; }
+    label { display: block; margin-top: 5px; }
+    input[type=number] { width: 120px; }
+    button { margin-top: 10px; }
+    #pairInfo { margin-top: 10px; font-weight: bold; }
+    /* Hotspot styles */
+    .hotspot-section { margin-top: 15px; border-top: 1px solid #ddd; padding-top: 10px; }
+    #hotspotList { margin-top: 10px; max-height: 100px; overflow-y: auto; }
+    .hotspot-item { margin-bottom: 5px; display: flex; justify-content: space-between; }
+    .hotspot-item button { margin-top: 0; margin-left: 5px; }
+    /* Hotspot marker in 3D scene */
+    .hotspot-marker {
+      position: absolute;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background-color: rgba(255, 0, 0, 0.7);
+      border: 2px solid white;
+      transform: translate(-50%, -50%);
+      cursor: pointer;
+      z-index: 5;
+    }
+    
+    /* Style for highlighting hotspot placement mode */
+    .hotspot-mode-active {
+      font-weight: bold;
+      color: #ff3300;
+    }
+  </style>
+</head>
+<body>
+  <div id="controls">
+    <label>Initial transform file:
+      <input type="file" id="initTransformInput" accept=".json">
+    </label>
+    <div id="pairInfo"></div>
+    <label>Rotate X: <input type="number" value="0" id="rotX" step="1"></label>
+    <label>Rotate Y: <input type="number" value="0" id="rotY" step="1"></label>
+    <label>Rotate Z: <input type="number" value="0" id="rotZ" step="1"></label>
+    <label>Translate X: <input type="number" value="0" step="0.1" id="transX"></label>
+    <label>Translate Y: <input type="number" value="0" step="0.1" id="transY"></label>
+    <label>Translate Z: <input type="number" value="0" step="0.1" id="transZ"></label>
+    <label>Scale: <input type="number" value="1" step="0.1" min="0" id="scale"></label>
+    <button id="resetBtn">Reset</button>
+    <button id="exportBtn">Export matrix for this pair</button>
+    <button id="nextPairBtn">Next pair</button>
+    <button id="downloadAllBtn">Download all alignments</button>
+    <div id="matrixOutput"></div>
+    
+    <!-- Hotspot Controls -->
+    <div class="hotspot-section">
+      <h3>Hotspots</h3>
+      <button id="addHotspotBtn">Add hotspot</button>
+      <div>
+        <label for="targetSceneSelect">Target scene:</label>
+        <select id="targetSceneSelect"></select>
+      </div>
+      <div id="hotspotList"></div>
+    </div>
+  </div>
+  <script type="module" src="scripts/alignment.js"></script>
+</body>
+</html>
