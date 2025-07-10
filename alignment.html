@@ -41,7 +41,7 @@
 </head>
 <body>
   <div id="controls">
-    <label>Initial Transform File:
+    <label>Initial transform file:
       <input type="file" id="initTransformInput" accept=".json">
     </label>
     <div id="pairInfo"></div>
@@ -53,22 +53,22 @@
     <label>Translate Z: <input type="number" value="0" step="0.1" id="transZ"></label>
     <label>Scale: <input type="number" value="1" step="0.1" min="0" id="scale"></label>
     <button id="resetBtn">Reset</button>
-    <button id="exportBtn">Export Matrix for This Pair</button>
-    <button id="nextPairBtn">Next Pair</button>
-    <button id="downloadAllBtn">Download All Alignments</button>
+    <button id="exportBtn">Export matrix for this pair</button>
+    <button id="nextPairBtn">Next pair</button>
+    <button id="downloadAllBtn">Download all alignments</button>
     <div id="matrixOutput"></div>
     
     <!-- Hotspot Controls -->
     <div class="hotspot-section">
       <h3>Hotspots</h3>
-      <button id="addHotspotBtn">Add Hotspot</button>
+      <button id="addHotspotBtn">Add hotspot</button>
       <div>
-        <label for="targetSceneSelect">Target Scene:</label>
+        <label for="targetSceneSelect">Target scene:</label>
         <select id="targetSceneSelect"></select>
       </div>
       <div id="hotspotList"></div>
     </div>
   </div>
-  <script type="module" src="scripts/alignement.js"></script>
+  <script type="module" src="scripts/alignment.js"></script>
 </body>
 </html>
