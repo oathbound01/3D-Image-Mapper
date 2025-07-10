@@ -135,7 +135,6 @@
             font-size: 16px;
         }
 
-        /* Toast notification system */
         .toast {
             position: fixed;
             top: 20px;
@@ -222,7 +221,6 @@
 <div class="toast" id="toastNotification">Tour started!</div>
 <script type="module" src="/src/main.js"></script>
 <script>
-    // Toast notification script
     function showToast(message, type = 'success') {
         const toast = document.getElementById('toastNotification');
         toast.textContent = message;
@@ -232,9 +230,6 @@
             toast.classList.remove('show');
         }, 3000);
     }
-
-    // Example of showing a toast notification
-    showToast('Welcome to the WebXR Virtual Tour!', 'info');
 </script>
 </body>
 </html>

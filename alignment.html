@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>PCD–Panorama Alignment Tool</title>
+  <title>PCD-Panorama Alignment Tool</title>
   <style>
     * {
       box-sizing: border-box;
@@ -371,7 +371,6 @@
       margin-right: 8px;
     }
 
-    /* Toast notification system */
     .toast {
       position: fixed;
       top: 20px;
@@ -412,7 +411,6 @@
       box-shadow: 0 4px 15px rgba(255, 107, 107, 0.3);
     }
 
-    /* Status indicator */
     .status-indicator {
       display: inline-block;
       width: 8px;
@@ -435,7 +433,6 @@
     <a class="back-button" href="/">Back to main menu</a>
     <div id="pairInfo"></div>
     
-    <!-- Transform Controls in compact layout -->
     <div class="control-group">
       <h4>🔄 Rotation (°)</h4>
       <div class="input-row">
@@ -471,7 +468,6 @@
       <label>Scale: <input type="number" value="1" step="0.1" min="0" id="scale" placeholder="1.0"></label>
     </div>
 
-    <!-- Hotspot Controls -->
     <div class="hotspot-section">
       <h3>📍 Hotspots</h3>
       <label for="targetSceneSelect">🎯 Target:</label>
@@ -482,7 +478,6 @@
       <div id="hotspotList"></div>
     </div>
 
-    <!-- Action Buttons in grid -->
     <div class="button-grid">
       <button id="resetBtn">🔄 Reset values</button>
       <button id="exportBtn" title="Save current pair configuration and hotspots to memory">💾 Save config<span class="status-indicator" id="saveStatus"></span></button>

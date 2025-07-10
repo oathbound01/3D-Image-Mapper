@@ -24,7 +24,7 @@ let hotspotMarkers = [];
 let camera, scene, renderer, controls;
 let panoSphere, pointCloud;
 let pcdGroup = new THREE.Group();
-let isSystemUpdate = false; // Flag to track system updates vs user changes
+let isSystemUpdate = false;
 
 window.addEventListener('DOMContentLoaded', init);
 
@@ -111,7 +111,6 @@ function updateTransform() {
   
   updateHotspotPositions();
   
-  // Mark as unsaved when transforms change (but not during system updates)
   if (!isSystemUpdate && (
       document.getElementById('rotX').value !== '0' || 
       document.getElementById('rotY').value !== '0' || 
@@ -410,7 +409,6 @@ function setupControls(pairCount) {
   });
 
   downloadAllBtn.addEventListener('click', () => {
-    // Check if all pairs have been saved
     const totalPairs = Math.min(pcdFiles.length, imgFiles.length);
     const savedPairs = Object.keys(alignments).filter(key => alignments[key] && alignments[key].matrix).length;
     
@@ -552,32 +550,26 @@ function animate() {
   requestAnimationFrame(animate);
 }
 
-// Toast notification system
 function showToast(message, type = 'success', duration = 3000) {
-  // Remove existing toast if any
   const existingToast = document.querySelector('.toast');
   if (existingToast) {
     existingToast.remove();
   }
   
-  // Create new toast
   const toast = document.createElement('div');
   toast.className = `toast ${type}`;
   toast.textContent = message;
   
   document.body.appendChild(toast);
   
-  // Show toast with animation
   setTimeout(() => toast.classList.add('show'), 100);
   
-  // Hide toast after duration
   setTimeout(() => {
     toast.classList.remove('show');
     setTimeout(() => toast.remove(), 300);
   }, duration);
 }
 
-// Function to update save status indicator
 function updateSaveStatus(saved = false) {
   const indicator = document.getElementById('saveStatus');
   if (indicator) {
@@ -589,12 +581,10 @@ function updateSaveStatus(saved = false) {
   }
 }
 
-// Reset save status when loading a new pair or resetting
 function resetSaveStatus() {
   updateSaveStatus(false);
 }
 
-// Mark as unsaved when changes are made
 function markAsUnsaved() {
   updateSaveStatus(false);
 }
