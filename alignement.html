@@ -14,6 +14,29 @@
     input[type=number] { width: 120px; }
     button { margin-top: 10px; }
     #pairInfo { margin-top: 10px; font-weight: bold; }
+    /* Hotspot styles */
+    .hotspot-section { margin-top: 15px; border-top: 1px solid #ddd; padding-top: 10px; }
+    #hotspotList { margin-top: 10px; max-height: 100px; overflow-y: auto; }
+    .hotspot-item { margin-bottom: 5px; display: flex; justify-content: space-between; }
+    .hotspot-item button { margin-top: 0; margin-left: 5px; }
+    /* Hotspot marker in 3D scene */
+    .hotspot-marker {
+      position: absolute;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background-color: rgba(255, 0, 0, 0.7);
+      border: 2px solid white;
+      transform: translate(-50%, -50%);
+      cursor: pointer;
+      z-index: 5;
+    }
+    
+    /* Style for highlighting hotspot placement mode */
+    .hotspot-mode-active {
+      font-weight: bold;
+      color: #ff3300;
+    }
   </style>
 </head>
 <body>
@@ -34,6 +57,17 @@
     <button id="nextPairBtn">Next Pair</button>
     <button id="downloadAllBtn">Download All Alignments</button>
     <div id="matrixOutput"></div>
+    
+    <!-- Hotspot Controls -->
+    <div class="hotspot-section">
+      <h3>Hotspots</h3>
+      <button id="addHotspotBtn">Add Hotspot</button>
+      <div>
+        <label for="targetSceneSelect">Target Scene:</label>
+        <select id="targetSceneSelect"></select>
+      </div>
+      <div id="hotspotList"></div>
+    </div>
   </div>
   <script type="module" src="scripts/alignement.js"></script>
 </body>

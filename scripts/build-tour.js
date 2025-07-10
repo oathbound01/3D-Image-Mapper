@@ -45,11 +45,11 @@ try {
         throw new Error(`Alignments file not found at ${ALIGNMENTS_PATH}. Please run the alignment utility and save the file.`);
     }
     const alignments = JSON.parse(fs.readFileSync(ALIGNMENTS_PATH, 'utf-8'));
-    console.log(`Loaded ${Object.keys(alignments).length} alignments.`);
+    console.log(`Loaded ${alignments.length} alignments.`);
 
     // 2. Get the lists of files to match indices
-    pcdFiles = readFileList(PCD_PATH, ['.pcd']);
-    imgFiles = readFileList(IMG_PATH, IMAGE_EXTENSIONS);
+    pcdFiles = readFileList(path.resolve(PCD_PATH), ['.pcd']);
+    imgFiles = readFileList(path.resolve(IMG_PATH), IMAGE_EXTENSIONS);
 
     if (pcdFiles.length === 0 || imgFiles.length === 0) {
         throw new Error('No PCD or image files found in the dataset directories.');
@@ -57,19 +57,29 @@ try {
 
     // 3. Build the tour data structure
     const tourStops = [];
-    for (const index in alignments) {
-        if (Object.hasOwnProperty.call(alignments, index)) {
-            const idx = parseInt(index, 10);
-            if (idx < imgFiles.length && idx < pcdFiles.length) {
-                tourStops.push({
-                    image: path.join(IMG_PATH, imgFiles[idx]).replace(/\\/g, '/'),
-                    pcd: path.join(PCD_PATH, pcdFiles[idx]).replace(/\\/g, '/'),
-                    matrix: alignments[index].map(n => parseFloat(n)) // Ensure numbers, not strings
-                });
-            } else {
-                console.warn(`Skipping alignment for index ${idx} as it's out of bounds.`);
-            }
+    
+    // Process each alignment entry (new format is an array)
+    for (let i = 0; i < alignments.length; i++) {
+        const alignment = alignments[i];
+        
+
+        const tourStop = {
+            image: alignment.image,
+            pcd: alignment.pcd,
+            matrix: alignment.matrix.map(n => parseFloat(n)) // Ensure numbers, not strings
+        };
+        
+        // Process hotspots if they exist
+        if (alignment.hotspots && alignment.hotspots.length > 0) {
+            tourStop.hotspots = alignment.hotspots.map(hotspot => {
+                return {
+                    position: hotspot.position.map(n => parseFloat(n)), // Convert to numbers
+                    targetScene: hotspot.targetScene // Index of the target scene
+                };
+            });
         }
+        
+        tourStops.push(tourStop);
     }
 
     // 4. Write the output file

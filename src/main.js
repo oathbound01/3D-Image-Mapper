@@ -8,6 +8,7 @@ let controls;
 let tourData = []; // Initialize as an empty array
 let currentStopIndex = 0;
 let activeObjects = new THREE.Group();
+let hotspotObjects = new THREE.Group(); // Group for hotspot markers
 
 const worldMatrix = new THREE.Matrix4();
 
@@ -31,6 +32,10 @@ function createHoverMarker() {
 let mouseDownPos = null;
 let mouseMoved = false;
 
+// --- Raycaster for interactions ---
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+
 init();
 
 async function init() {
@@ -45,13 +50,13 @@ async function init() {
 
   scene = new THREE.Scene();
 
-
   // Axes Helper
   const axesHelper = new THREE.AxesHelper(2); // 2 units long
   scene.add(axesHelper);
 
   scene.background = new THREE.Color(0x101010);
   scene.add(activeObjects);
+  scene.add(hotspotObjects);
 
   camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
   camera.position.set(0, 0, 0);
@@ -98,6 +103,11 @@ async function loadStop(index) {
     activeObjects.remove(activeObjects.children[0]); 
   }
   
+  // Clear previous hotspots
+  while(hotspotObjects.children.length > 0) {
+    hotspotObjects.remove(hotspotObjects.children[0]);
+  }
+  
   const stopData = tourData[index];
 
   const textureLoader = new THREE.TextureLoader();
@@ -129,6 +139,10 @@ async function loadStop(index) {
 
     activeObjects.add(pcd);
 
+    // Create hotspots if they exist in this stop
+    if (stopData.hotspots && stopData.hotspots.length > 0) {
+      createHotspots(stopData.hotspots, pcdMatrix);
+    }
 
     activeObjects.position.set(0, 0, 0);
     activeObjects.quaternion.set(0, 0, 0, 1);
@@ -144,9 +158,56 @@ async function loadStop(index) {
   }
 }
 
+// Create hotspot markers
+function createHotspots(hotspots, pcdMatrix) {
+  hotspots.forEach((hotspot, idx) => {
+    // Create hotspot marker
+    const geometry = new THREE.SphereGeometry(0.1, 16, 16);
+    const material = new THREE.MeshBasicMaterial({
+      color: 0xff0000,
+      opacity: 0.7,
+      transparent: true
+    });
+    
+    const marker = new THREE.Mesh(geometry, material);
+    
+    // Set position based on hotspot data
+    const position = new THREE.Vector3(
+      hotspot.position[0],
+      hotspot.position[1],
+      hotspot.position[2]
+    );
+    
+    // Apply the PCD matrix transformation to position the hotspot correctly
+    position.applyMatrix4(pcdMatrix);
+    marker.position.copy(position);
+    
+    // Store target scene index in userData for click handling
+    marker.userData = {
+      type: 'hotspot',
+      targetSceneIndex: hotspot.targetScene
+    };
+    
+    // Add a pulsing effect to make hotspots more visible
+    marker.name = `hotspot-${idx}`;
+    
+    // Add to the scene
+    hotspotObjects.add(marker);
+  });
+}
+
 function navigate(direction) {
   const newIndex = currentStopIndex + direction;
   loadStop(newIndex);
+}
+
+// Navigate directly to a specific scene
+function navigateToScene(sceneIndex) {
+  if (sceneIndex >= 0 && sceneIndex < tourData.length) {
+    loadStop(sceneIndex);
+    return true;
+  }
+  return false;
 }
 
 function updateUI() {
@@ -163,6 +224,14 @@ function onWindowResize() {
 
 function animate() {
   controls.update();
+  
+  // Add a pulse effect to hotspots
+  const time = Date.now() * 0.001; // Time in seconds
+  hotspotObjects.children.forEach(hotspot => {
+    const scale = 1 + 0.2 * Math.sin(time * 3 + parseInt(hotspot.name.split('-')[1]) * 0.5);
+    hotspot.scale.set(scale, scale, scale);
+  });
+  
   renderer.render(scene, camera);
 }
 
@@ -181,22 +250,38 @@ function onMouseUp(event) {
 
   // Only treat as click if mouse did not move significantly
   if (moveDist < 5) {
-    onPointCloudClick(event);
+    onSceneClick(event);
   }
 }
 
-// --- Point Cloud Click Navigation (Front/Back) ---
-function onPointCloudClick(event) {
+// --- Scene Click Handler (Handles both point cloud and hotspots) ---
+function onSceneClick(event) {
   const rect = renderer.domElement.getBoundingClientRect();
-  const mouse = new THREE.Vector2(
-    ((event.clientX - rect.left) / rect.width) * 2 - 1,
-    -((event.clientY - rect.top) / rect.height) * 2 + 1
-  );
+  mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+  mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
 
-  const raycaster = new THREE.Raycaster();
-  raycaster.params.Points.threshold = 0.2;
   raycaster.setFromCamera(mouse, camera);
+  
+  // Check for hotspot intersections
+  const hotspotIntersects = raycaster.intersectObjects(hotspotObjects.children);
+  if (hotspotIntersects.length > 0) {
+    const hotspot = hotspotIntersects[0].object;
+    if (hotspot.userData && hotspot.userData.type === 'hotspot') {
+      const targetSceneIndex = hotspot.userData.targetSceneIndex;
+      if (navigateToScene(targetSceneIndex)) {
+        return; // Navigation handled, exit the function
+      }
+    }
+  }
+  
+  // We still call handlePointCloudClick for consistency and future extensions
+  handlePointCloudClick(raycaster);
+}
 
+// --- Point Cloud Click Navigation (removing front/back navigation, only keeping custom hotspots) ---
+function handlePointCloudClick(raycaster) {
+  raycaster.params.Points.threshold = 0.2;
+  
   let pointCloud = null;
   activeObjects.traverse(obj => {
     if (obj.isPoints) pointCloud = obj;
@@ -206,99 +291,38 @@ function onPointCloudClick(event) {
   const intersects = raycaster.intersectObject(pointCloud);
   if (intersects.length === 0) return;
 
-  const clickedPoint = intersects[0].point;
-  const camDir = new THREE.Vector3();
-  camera.getWorldDirection(camDir);
-
-  // Vector from camera to clicked point (in world space)
-  const camToPoint = new THREE.Vector3().subVectors(clickedPoint, camera.position).normalize();
-
-  // Angle between camera forward and camToPoint
-  const angle = camDir.angleTo(camToPoint);
-
-  // Define front zone (within 45deg of camera forward), back zone (within 45deg of camera backward)
-  const FRONT_ANGLE = Math.PI / 4; // 45 degrees
-
-  let navigated = false;
-
-  // Front: previous stop
-  if (currentStopIndex > 0 && angle < FRONT_ANGLE) {
-    loadStop(currentStopIndex - 1);
-    navigated = true;
-  }
-  // Back: next stop
-  if (!navigated && currentStopIndex < tourData.stops.length - 1 && angle > Math.PI - FRONT_ANGLE) {
-    loadStop(currentStopIndex + 1);
-    navigated = true;
-  }
-
-  if (!navigated) {
-    infoDiv.textContent = "Click in front (previous) or back (next) to navigate.";
-  }
+  // Point cloud was clicked but we're not doing automatic navigation anymore
+  // Keep this function for future extensions if needed
 }
 
-// --- Hover Feedback Logic (Front/Back Zones) ---
+// --- Hover Feedback Logic (only for custom hotspots) ---
 function onMouseMoveHover(event) {
   const rect = renderer.domElement.getBoundingClientRect();
-  const mouse = new THREE.Vector2(
-    ((event.clientX - rect.left) / rect.width) * 2 - 1,
-    -((event.clientY - rect.top) / rect.height) * 2 + 1
-  );
+  mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+  mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
 
-  const raycaster = new THREE.Raycaster();
-  raycaster.params.Points.threshold = 0.2;
   raycaster.setFromCamera(mouse, camera);
-
-  let pointCloud = null;
-  activeObjects.traverse(obj => {
-    if (obj.isPoints) pointCloud = obj;
-  });
-  if (!pointCloud) {
-    hoverMarker.visible = false;
-    renderer.domElement.style.cursor = 'default';
-    updateUI();
-    return;
+  
+  // Check hotspot hover
+  const hotspotIntersects = raycaster.intersectObjects(hotspotObjects.children);
+  if (hotspotIntersects.length > 0) {
+    const hotspot = hotspotIntersects[0].object;
+    if (hotspot.userData && hotspot.userData.type === 'hotspot') {
+      const targetSceneIndex = hotspot.userData.targetSceneIndex;
+      
+      // Show hotspot hover feedback
+      hoverMarker.position.copy(hotspot.position);
+      hoverMarker.visible = true;
+      renderer.domElement.style.cursor = 'pointer';
+      infoDiv.textContent = `Go to Scene ${targetSceneIndex + 1}`;
+      return;
+    }
   }
-
-  const intersects = raycaster.intersectObject(pointCloud);
-  if (intersects.length === 0) {
-    hoverMarker.visible = false;
-    renderer.domElement.style.cursor = 'default';
-    updateUI();
-    return;
-  }
-
-  const intersectPoint = intersects[0].point;
-  const camDir = new THREE.Vector3();
-  camera.getWorldDirection(camDir);
-  const camToPoint = new THREE.Vector3().subVectors(intersectPoint, camera.position).normalize();
-  const angle = camDir.angleTo(camToPoint);
-  const FRONT_ANGLE = Math.PI / 4; // 45 degrees
-
-  let hoveredZone = null;
-  let hoverText = '';
-
-  // Front: previous stop
-  if (currentStopIndex > 0 && angle < FRONT_ANGLE) {
-    hoveredZone = 'front';
-    hoverText = 'Go to Previous Stop';
-  }
-  // Back: next stop
-  if (!hoveredZone && currentStopIndex < tourData.stops.length - 1 && angle > Math.PI - FRONT_ANGLE) {
-    hoveredZone = 'back';
-    hoverText = 'Go to Next Stop';
-  }
-
-  if (hoveredZone) {
-    hoverMarker.position.copy(intersectPoint);
-    hoverMarker.visible = true;
-    renderer.domElement.style.cursor = 'pointer';
-    infoDiv.textContent = `${hoverText} (${currentStopIndex + 1} / ${tourData.stops.length})`;
-  } else {
-    hoverMarker.visible = false;
-    renderer.domElement.style.cursor = 'default';
-    updateUI();
-  }
+  
+  // Reset if no hotspot is hovered
+  hoverMarker.visible = false;
+  renderer.domElement.style.cursor = 'default';
+  updateUI();
 }
 
 // --- Point Cloud Filtering ---
@@ -314,10 +338,10 @@ function filterPointCloudNearOrigin(pointCloud, cylinderRadius = 0.25, cylinderH
     const y = positions.getY(i);
     const z = positions.getZ(i);
     
-    // Calcola distanza dal centro nel piano XY (raggio cilindro)
+    // Calculate distance from center in XY plane (cylinder radius)
     const distanceXY = Math.sqrt(x * x + y * y);
     
-    // Controlla se il punto è fuori dal cilindro di esclusione
+    // Check if point is outside the exclusion cylinder
     if (distanceXY > cylinderRadius || Math.abs(z) > cylinderHeight / 2) {
       filteredPositions.push(x, y, z);
       
@@ -331,7 +355,7 @@ function filterPointCloudNearOrigin(pointCloud, cylinderRadius = 0.25, cylinderH
     }
   }
   
-  // Crea nuova geometria con i punti filtrati
+  // Create new geometry with filtered points
   const newGeometry = new THREE.BufferGeometry();
   newGeometry.setAttribute('position', new THREE.Float32BufferAttribute(filteredPositions, 3));
   
@@ -339,7 +363,7 @@ function filterPointCloudNearOrigin(pointCloud, cylinderRadius = 0.25, cylinderH
     newGeometry.setAttribute('color', new THREE.Float32BufferAttribute(filteredColors, 3));
   }
   
-  // Sostituisci la geometria esistente
+  // Replace existing geometry
   pointCloud.geometry.dispose();
   pointCloud.geometry = newGeometry;
   
