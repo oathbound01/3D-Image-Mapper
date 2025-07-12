@@ -51,6 +51,11 @@ try {
         const alignment = alignments[i];
         
 
+        if (!alignment.matrix) {
+            console.warn(`Alignment at index ${i} is missing a matrix. Skipping this alignment.`);
+            continue;
+        }    
+
         const tourStop = {
             image: alignment.image,
             pcd: alignment.pcd,
