@@ -119,7 +119,7 @@ function updateTransform() {
       document.getElementById('transY').value !== '0' ||
       document.getElementById('transZ').value !== '0' ||
       document.getElementById('scale').value !== '1')) {
-    markAsUnsaved();
+    updateSaveStatus(false);
   }
 }
 
@@ -249,8 +249,7 @@ function addHotspot(position) {
   
   updateHotspotList();
   
-  // Mark as unsaved when hotspot is added
-  markAsUnsaved();
+  updateSaveStatus(false);
 }
 
 function createHotspotMarker(hotspot) {
@@ -339,8 +338,7 @@ function deleteHotspot(hotspotId) {
   
   updateHotspotList();
   
-  // Mark as unsaved when hotspot is deleted
-  markAsUnsaved();
+  updateSaveStatus(false);
 }
 
 function setupControls(pairCount) {
@@ -367,7 +365,7 @@ function setupControls(pairCount) {
     transX.value = transY.value = transZ.value = 0;
     scale.value = 1;
     updateTransform();
-    resetSaveStatus();
+    updateSaveStatus(false);
     isSystemUpdate = false;
   });
 
@@ -378,7 +376,7 @@ function setupControls(pairCount) {
       pcdGroup.quaternion,
       pcdGroup.scale
     );
-    const matArr = mat.toArray().map(n => n.toFixed(6));
+    const matArr = mat.toArray().map(n => parseFloat(n.toFixed(6)));
     
     if (!alignments[currentIndex]) {
       alignments[currentIndex] = {};
@@ -393,7 +391,7 @@ function setupControls(pairCount) {
       }));
     }
     
-    showToast('✅ Configuration and hotspots saved to memory!', 'success');
+    showToast('Configuration and hotspots saved to memory!', 'success');
     updateSaveStatus(true);
   });
 
@@ -401,7 +399,7 @@ function setupControls(pairCount) {
     exportBtn.click();
     currentIndex++;
     if (currentIndex >= pairCount) {
-      showToast('🎉 All pairs completed! Use "Download All" to save your work.', 'info', 4000);
+      showToast('All pairs completed! Use "Download All" to save your work.', 'info', 4000);
       currentIndex = pairCount - 1;
       return;
     }
@@ -417,14 +415,15 @@ function setupControls(pairCount) {
       if (!confirm(message)) {
         return;
       }
-      showToast(`⚠️ Downloaded incomplete configuration (${savedPairs}/${totalPairs} pairs)`, 'warning', 4000);
+      showToast(`Downloaded incomplete configuration (${savedPairs}/${totalPairs} pairs)`, 'warning', 4000);
     } else {
-      showToast('✅ Downloaded complete configuration for all pairs!', 'success');
+      showToast('Downloaded complete configuration for all pairs!', 'success');
     }
     
     const finalOutput = [];
     
-    for (let i = 0; i < Math.min(pcdFiles.length, imgFiles.length); i++) {
+    for (let i = 0; i < savedPairs; i++) {
+      
       const sceneData = {
         image: `public${IMG_PATH}${imgFiles[i]}`,
         pcd: `public${PCD_PATH}${pcdFiles[i]}`
@@ -535,7 +534,7 @@ async function loadPair(idx) {
   }
   
   updateHotspotList();
-  resetSaveStatus();
+  updateSaveStatus(false);
 }
 
 function onWindowResize() {
@@ -581,6 +580,8 @@ function updateSaveStatus(saved = false) {
   }
 }
 
+
+/*
 function resetSaveStatus() {
   updateSaveStatus(false);
 }
@@ -588,3 +589,4 @@ function resetSaveStatus() {
 function markAsUnsaved() {
   updateSaveStatus(false);
 }
+**/

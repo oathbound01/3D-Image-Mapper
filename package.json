@@ -12,8 +12,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview",
-    "build:tour": "node scripts/build-tour.js"
+    "preview": "vite preview"
   },
   "repository": {
     "type": "git",

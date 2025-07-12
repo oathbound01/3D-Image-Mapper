@@ -72,14 +72,7 @@ Built by <a href="https://github.com/nicolobartolinii">Nicolò Bartolini</a> and
 
    <img src="docs/alignment tool UI.png" width=768></img>
 
-6. **Run the tour building script:**
-
-   In the root folder of the project, run this command:
-   ```bash
-   npm run build:tour
-   ```
-   This will create a `tour.json` file in the `public/` folder, which will then be used to actually explore the virtual tour environment.
-7. **Test out the virtual tour:**
+6. **Test out the virtual tour:**
 
    Once everything is done, simply navigate back to the main page of the browser-based application and select the *View tour* options to try it out.
 

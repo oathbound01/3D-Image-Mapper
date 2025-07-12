@@ -62,13 +62,13 @@ init();
 
 async function init() {
   try {
-    const response = await fetch("tour.json");
+    const response = await fetch("alignments.json");
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
     tourData = await response.json();
   } catch (error) {
-    showToast('❌ Error: Could not load tour data', 'error', 5000);
+    showToast('Error: Could not load tour data', 'error', 5000);
     console.error("Failed to fetch tour data:", error);
     return;
   }
@@ -126,7 +126,6 @@ async function init() {
   controller2.addEventListener("selectstart", onSelectStart);
   scene.add(controller2);
 
-  // Add laser pointers
   const geometry = new THREE.BufferGeometry().setFromPoints([
     new THREE.Vector3(0, 0, 0),
     new THREE.Vector3(0, 0, -1),
@@ -198,7 +197,7 @@ async function init() {
   if (tourData.length > 0) {
     await loadStop(0);
   } else {
-    showToast('⚠️ No stops found in tour data', 'warning', 5000);
+    showToast('No stops found in tour data', 'warning', 5000);
   }
 
   renderer.setAnimationLoop(animate);
@@ -235,7 +234,7 @@ async function loadStop(index) {
     activeObjects.add(panoSphere);
 
     // Point cloud
-    pcd.material.size = 0.03;
+    pcd.material.size = stopData.matrix[9] * 0.03;
     const pcdMatrix = new THREE.Matrix4().fromArray(stopData.matrix);
     pcd.geometry.applyMatrix4(pcdMatrix);
 
@@ -254,7 +253,7 @@ async function loadStop(index) {
 
     updateUI();
   } catch (error) {
-    showToast(`❌ Error loading stop ${index + 1}`, 'error', 4000);
+    showToast(`Error loading stop ${index + 1}`, 'error', 4000);
     console.error(`Failed to load stop ${index + 1}:`, error);
   }
 }

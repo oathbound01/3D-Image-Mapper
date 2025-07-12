@@ -72,14 +72,7 @@ Creato da <a href="https://github.com/nicolobartolinii">Nicolò Bartolini</a> e 
 
    <img src="docs/alignment tool UI.png" width=768></img>
 
-6. **Esegui lo script di costruzione del tour:**
-
-   Nella cartella principale del progetto, esegui questo comando:
-   ```bash
-   npm run build:tour
-   ```
-   Questo creerà un file `tour.json` nella cartella `public/`, che verrà poi utilizzato per esplorare effettivamente l'ambiente del tour virtuale.
-7. **Prova il tour virtuale:**
+6. **Prova il tour virtuale:**
 
    Una volta terminato tutto, naviga semplicemente alla pagina principale dell'applicazione sul tuo browser e seleziona l'opzione *Visualizza tour* per provarlo.
 
