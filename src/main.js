@@ -5,6 +5,7 @@ import { VRButton } from "three/examples/jsm/webxr/VRButton.js";
 
 // --- Scene globals ---
 let camera, scene, renderer, controls;
+let controller1, controller2;
 let tourData = [];
 let currentStopIndex = 0;
 const activeObjects = new THREE.Group();
@@ -98,6 +99,45 @@ async function init() {
   controls.enableDamping = true;
 
   document.body.appendChild(renderer.domElement);
+
+  // --- VR Controllers ---
+  function onSelectStart(event) {
+    const controller = event.target;
+    const intersections = getIntersections(controller);
+
+    if (intersections.length > 0) {
+      let hotspot = intersections[0].object;
+      while (hotspot.parent && !hotspot.userData.type) {
+        hotspot = hotspot.parent;
+      }
+
+      if (hotspot.userData && hotspot.userData.type === "hotspot") {
+        const targetSceneIndex = hotspot.userData.targetSceneIndex;
+        navigateToScene(targetSceneIndex);
+      }
+    }
+  }
+
+  controller1 = renderer.xr.getController(0);
+  controller1.addEventListener("selectstart", onSelectStart);
+  scene.add(controller1);
+
+  controller2 = renderer.xr.getController(1);
+  controller2.addEventListener("selectstart", onSelectStart);
+  scene.add(controller2);
+
+  // Add laser pointers
+  const geometry = new THREE.BufferGeometry().setFromPoints([
+    new THREE.Vector3(0, 0, 0),
+    new THREE.Vector3(0, 0, -1),
+  ]);
+
+  const line = new THREE.Line(geometry);
+  line.name = "line";
+  line.scale.z = 5;
+
+  controller1.add(line.clone());
+  controller2.add(line.clone());
   
   const vrWrapper = document.createElement('div');
   vrWrapper.style.position = 'fixed';
@@ -302,8 +342,39 @@ function onWindowResize() {
   renderer.setSize(window.innerWidth, window.innerHeight);
 }
 
+const tempMatrix = new THREE.Matrix4();
+
+function getIntersections(controller) {
+  tempMatrix.identity().extractRotation(controller.matrixWorld);
+  raycaster.ray.origin.setFromMatrixPosition(controller.matrixWorld);
+  raycaster.ray.direction.set(0, 0, -1).applyMatrix4(tempMatrix);
+  return raycaster.intersectObjects(hotspotObjects.children, true);
+}
+
 function animate() {
   controls.update();
+
+  if (renderer.xr.isPresenting) {
+    const intersections1 = getIntersections(controller1);
+    const line1 = controller1.getObjectByName("line");
+    if (line1) {
+      if (intersections1.length > 0) {
+        line1.material.color.setHex(0x00ff00); // green
+      } else {
+        line1.material.color.setHex(0xffffff); // white
+      }
+    }
+
+    const intersections2 = getIntersections(controller2);
+    const line2 = controller2.getObjectByName("line");
+    if (line2) {
+      if (intersections2.length > 0) {
+        line2.material.color.setHex(0x00ff00); // green
+      } else {
+        line2.material.color.setHex(0xffffff); // white
+      }
+    }
+  }
 
   const time = Date.now() * 0.001;
   hotspotObjects.children.forEach((hotspot, index) => {
