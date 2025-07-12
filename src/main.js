@@ -91,6 +91,7 @@ async function init() {
   renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.xr.enabled = true;
+  renderer.xr.setReferenceSpaceType('local');
 
   controls = new OrbitControls(camera, renderer.domElement);
   controls.enableZoom = true;
